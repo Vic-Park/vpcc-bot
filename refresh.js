@@ -10,6 +10,23 @@ const commands = [
 		name: "ping",
 		description: "Replies with pong",
 	},
+	{
+		name: "profile",
+		description: "Shows a summary of your profile",
+		options: [
+			{
+				name: "type",
+				description: "The type of summary to show",
+				type: 3,  // STRING
+				required: false,
+				choices: [
+					{ name: "medals", value: "medals" },
+					{ name: "points", value: "points" },
+					{ name: "team", value: "team" },
+				],
+			},
+		],
+	},
 ];
 
 const rest = new REST({ version: "9" }).setToken(process.env.BOT_TOKEN);

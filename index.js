@@ -15,6 +15,13 @@ client.on("interactionCreate", async interaction => {
 
 	if (interaction.commandName === "ping") {
 		await interaction.reply("pong");
+		return;
+	}
+
+	if (interaction.commandName === "profile") {
+		const type = interaction.options.getString("type") || "normal";
+		await interaction.reply(`haha lol ${type}`);
+		return;
 	}
 });
 
