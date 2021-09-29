@@ -20,9 +20,95 @@ const commands = [
 				type: 3,  // STRING
 				required: false,
 				choices: [
+					{ name: "user", value: "user" },
 					{ name: "medals", value: "medals" },
 					{ name: "points", value: "points" },
 					{ name: "team", value: "team" },
+				],
+			},
+		],
+	},
+	{
+		name: "team",
+		description: "Manage teams",
+		options: [
+			{
+				name: "join",
+				description: "Joins a team and creates one if it doesn't exist",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "name",
+						description: "Name of team",
+						type: 3,  // STRING
+						required: true,
+					},
+				],
+			},
+			{
+				name: "leave",
+				description: "Leaves your team and destroys it if empty",
+				type: 1,  // SUB_COMMAND
+			},
+			{
+				name: "rename",
+				description: "Renames your team",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "name",
+						description: "New name of team",
+						type: 3,  // STRING
+						required: true,
+					},
+				],
+			},
+		],
+	},
+	{
+		name: "leaderboard",
+		description: "Shows the leaderboard with the top teams",
+	},
+	{
+		name: "points",
+		description: "Manages points",
+		options: [
+			{
+				name: "give-team",
+				description: "Gives a team a specified number of points",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "name",
+						description: "Name of team",
+						type: 3,  // STRING
+						required: true,
+					},
+					{
+						name: "points",
+						description: "Amount of points to give",
+						type: 4,  // INTEGER
+						required: true,
+					},
+				],
+			},
+			{
+				name: "give-voice",
+				description: "Gives all teams with at least one member in a voice channel a specified number of points",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "name",
+						description: "Voice channel to target",
+						type: 7,  // CHANNEL
+						required: true,
+					},
+					{
+						name: "points",
+						description: "Amount of points to give",
+						type: 4,  // INTEGER
+						required: true,
+					},
 				],
 			},
 		],
