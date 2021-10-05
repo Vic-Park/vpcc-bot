@@ -105,6 +105,56 @@ client.on("interactionCreate", async interaction => {
 
 	if (interaction.commandName === "profile") {
 		const type = interaction.options.getString("type") || "user";
+		if (type === "user") {
+			console.log([ "profile", "user", metadata ]);
+			await interaction.deferReply();
+			// find user
+			const userIds = (await get(store, "/users")).userIds || [];
+			let userId = await findPredicate(userIds, async userId => {
+				return interaction.user.id === (await get(store, `/user/${userId}`)).discordUserId;
+			});
+			// create user if necessary
+			if (userId == null) {
+				userId = interaction.id;
+				await modify(store, `/users`, data => {
+					data.userIds = data.userIds || [];
+					data.userIds.push(userId);
+				});
+				await modify(store, `/user/${userId}`, data => {
+					data.discordUserId = interaction.user.id;
+				});
+			}
+			// get current team / points / medals
+			const userData = await get(store, `/user/${userId}`);
+			// get team
+			const teamId = userData.teamId;
+			const teamName = teamId && (await get(store, `/team/${teamId}`)).name;
+			// get points this month
+			const pointsThisMonth = [...userData.pointEvents || []].reduce((points, { type, deltaPoints }) => {
+				if (type == "add") {
+					return points + deltaPoints;
+				}
+				if (type == "clear") {
+					return 0;
+				}
+			}, 0);
+			// get number of medals
+			const numMedals = [...userData.medalEvents || []].reduce((numMedals, { type }) => {
+				if (type == "add") {
+					return numMedals + 1;
+				}
+			}, 0);
+			// build response
+			const parts = [];
+			parts.push(`Summary for ${metadata.userDisplayName}`);
+			if (teamId)
+				parts.push(`- Team: ${teamName}`);
+			parts.push(`- Points this month: ${pointsThisMonth}`);
+			parts.push(`- Medals: ${numMedals}`);
+			// send response
+			await interaction.editReply({ content: parts.join("\n"), allowedMentions: { parse: [] }});
+			return;
+		}
 		await interaction.reply(`haha lol ${type}`);
 		return;
 	}
