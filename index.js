@@ -116,11 +116,6 @@ client.on("interactionCreate", async interaction => {
 			console.log([ "team", "join", name, metadata ]);
 			// defer reply cuz it might take a while maybe
 			await interaction.deferReply();
-			// find team
-			const teamIds = (await get(store, "/teams")).teamIds || [];
-			let targetTeamId = await findPredicate(teamIds, async teamId => {
-				return name === (await get(store, `/team/${teamId}`)).name;
-			});
 			// find user
 			const userIds = (await get(store, "/users")).userIds || [];
 			let targetUserId = await findPredicate(userIds, async userId => {
@@ -166,6 +161,11 @@ client.on("interactionCreate", async interaction => {
 					data.discordUserId = interaction.user.id;
 				});
 			}
+			// find team
+			const teamIds = (await get(store, "/teams")).teamIds || [];
+			let targetTeamId = await findPredicate(teamIds, async teamId => {
+				return name === (await get(store, `/team/${teamId}`)).name;
+			});
 			// create team if necessary
 			let createdNewTeam = false;
 			if (targetTeamId == null) {
