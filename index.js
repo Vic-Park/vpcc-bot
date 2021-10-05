@@ -26,7 +26,11 @@ const store = {
 				mapping[key] = undefined;
 			} else {
 				try {
-					mapping[key] = JSON.parse(value);
+					const obj = JSON.parse(value);
+					if (JSON.stringify(obj) == value)
+						mapping[key] = obj;
+					else
+						mapping[key] = value;
 				} catch (e) {
 					mapping[key] = value;
 				}
@@ -52,53 +56,27 @@ const store = {
 	},
 };
 
-async function getEvents(store, resource) {
+async function get(store, resource) {
 	const raw = await store.get(resource);
-	if (raw === "") return [];
+	if (raw === "") return {};
 	return JSON.parse(raw);
 }
 
-async function setEvents(store, resource, events) {
-	if (events.length === 0) return await store.set(resource, "");
-	return await store.set(resource, JSON.stringify(events));
+async function set(store, resource, data) {
+	if (Object.keys(data).length === 0) return await store.set(resource, "");
+	return await store.set(resource, JSON.stringify(data));
 }
 
-async function appendEvent(store, resource, key, value) {
-	const events = await getEvents(store, resource);
-	events.push({ timestamp: Date.now(), key, value })
-	await setEvents(store, resource, events);
+async function modify(store, resource, callback) {
+	const data = await get(store, resource);
+	await callback(data);
+	await set(store, resource, data);
 }
 
-async function getUserIds(store) {
-	const userIds = [];
-	for (const event of await getEvents(store, "/users")) {
-		if (event.key === "users") {
-			if (event.value.type === "add") {
-				userIds.push(event.value.userId);
-			} else if (event.value.type == "remove") {
-				const index = userIds.lastIndexOf(event.value.userId);
-				if (index !== -1)
-					userIds.splice(index, 1);
-			}
-		}
-	}
-	return userIds;
-}
-
-async function getTeamIds(store) {
-	const teamIds = [];
-	for (const event of await getEvents(store, "/teams")) {
-		if (event.key === "teams") {
-			if (event.value.type === "add") {
-				teamIds.push(event.value.teamId);
-			} else if (event.value.type == "remove") {
-				const index = teamIds.lastIndexOf(event.value.teamId);
-				if (index !== -1)
-					teamIds.splice(index, 1);
-			}
-		}
-	}
-	return teamIds;
+function removeFromArray(array, element) {
+	const index = array.lastIndexOf(element);
+	if (index !== -1)
+		array.splice(index, 1);
 }
 
 async function findPredicate(array, predicate) {
@@ -114,9 +92,14 @@ client.on("interactionCreate", async interaction => {
 	if (!interaction.isCommand())
 		return;
 
+	const metadata = {
+		timestamp: Date.now(),
+		userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
+		userId: interaction.user.id,
+	};
+
 	if (interaction.commandName === "ping") {
 		await interaction.reply("pong");
-		console.log(JSON.stringify(store.data, null, 2));
 		return;
 	}
 
@@ -128,119 +111,89 @@ client.on("interactionCreate", async interaction => {
 
 	if (interaction.commandName === "team") {
 		const subcommandName = interaction.options.getSubcommand(true);
-		const displayName = `${interaction.user.username}#${interaction.user.discriminator}`;
 		if (subcommandName === "join") {
+			const name = interaction.options.getString("name", true);
+			console.log([ "team", "join", name, metadata ]);
 			// defer reply cuz it might take a while maybe
 			await interaction.deferReply();
-			const name = interaction.options.getString("name", true);
-			// create team if necessary
-			const teamIds = await getTeamIds(store);
+			// find team
+			const teamIds = (await get(store, "/teams")).teamIds || [];
 			let targetTeamId = await findPredicate(teamIds, async teamId => {
-				return name === [...await getEvents(store, `/team/${teamId}`)]
-					.filter(({ key }) => key === "name")
-					.reduce((_, { value: { name } }) => name, null);
-			})
+				return name === (await get(store, `/team/${teamId}`)).name;
+			});
+			// find user
+			const userIds = (await get(store, "/users")).userIds || [];
+			let targetUserId = await findPredicate(userIds, async userId => {
+				return interaction.user.id === (await get(store, `/user/${userId}`)).discordUserId;
+			});
+			// leave previous team if exists and has one
+			if (targetUserId != null) {
+				let previousTeamId = (await get(store, `/user/${targetUserId}`)).teamId;
+				if (previousTeamId != null) {
+					await modify(store, `/team/${previousTeamId}`, data => {
+						data.memberIds = data.memberIds || [];
+						removeFromArray(data.memberIds, targetUserId);
+					});
+					await modify(store, `/user/${targetUserId}`, data => {
+						data.teamId = undefined;
+					});
+					// leave role
+					const previousTeamDiscordRoleId = (await get(store, `/team/${previousTeamId}`)).discordRoleId;
+					if (previousTeamDiscordRoleId != null) {
+						const discordMember = await interaction.guild.members.fetch(interaction.user.id);
+						await discordMember.roles.remove(previousTeamDiscordRoleId);
+					}
+					// remove team if empty
+					const previousTeamMemberIds = (await get(store, `/team/${previousTeamId}`)).memberIds || [];
+					if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
+						await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
+						await modify(store, `/teams`, data => {
+							data.teamIds = data.teamIds || [];
+							removeFromArray(data.teamIds, previousTeamId);
+						});
+						await set(store, `/team/${previousTeamId}`, {});
+					}
+				}
+			}
+			// create user if necessary
+			if (targetUserId == null) {
+				targetUserId = interaction.id;
+				await modify(store, `/users`, data => {
+					data.userIds = data.userIds || [];
+					data.userIds.push(targetUserId);
+				});
+				await modify(store, `/user/${targetUserId}`, data => {
+					data.discordUserId = interaction.user.id;
+				});
+			}
+			// create team if necessary
 			let createdNewTeam = false;
 			if (targetTeamId == null) {
 				createdNewTeam = true;
 				targetTeamId = interaction.id;
-				await appendEvent(store, `/teams`, "teams", {
-					type: "add",
-					teamId: targetTeamId,
-					reason: `created by ${displayName}`,
+				await modify(store, `/teams`, data => {
+					data.teamIds = data.teamIds || [];
+					data.teamIds.push(targetTeamId);
 				});
-				await appendEvent(store, `/team/${targetTeamId}`, "name", {
-					name: name,
-					reason: `created by ${displayName}`,
+				await modify(store, `/team/${targetTeamId}`, data => {
+					data.name = name;
 				});
-			}
-			// create user if necessary
-			const userIds = await getUserIds(store);
-			let targetUserId = await findPredicate(userIds, async userId => {
-				return interaction.user.id === [...await getEvents(store, `/user/${userId}`)]
-					.filter(({ key }) => key === "discordUser")
-					.reduce((_, { value: { discordUserId } }) => discordUserId, null);
-			})
-			if (targetUserId == null) {
-				targetUserId = interaction.id;
-				await appendEvent(store, `/users`, "users", {
-					type: "add",
-					userId: targetUserId,
-					reason: `created by ${displayName}`,
-				});
-				await appendEvent(store, `/user/${targetUserId}`, "discordUser", {
-					discordUserId: interaction.user.id,
-					reason: `created by ${displayName}`,
-				});
-			}
-			// leave previous team if has one
-			let previousTeamId = [...await getEvents(store, `/user/${targetUserId}`)]
-				.filter(({ key }) => key === "team")
-				.reduce((_, { value: { teamId } }) => teamId, null);
-			if (previousTeamId != null) {
-				await appendEvent(store, `/team/${previousTeamId}`, "members", {
-					type: "remove",
-					userId: targetUserId,
-					reason: `changing teams to ${targetTeamId} by ${displayName}`,
-				});
-				await appendEvent(store, `/user/${targetUserId}`, "team", {
-					teamId: null,
-					reason: `changing teams to ${targetTeamId} by ${displayName}`,
-				});
-				// leave role
-				const previousTeamDiscordRoleId = [...await getEvents(store, `/team/${previousTeamId}`)]
-					.filter(({ key }) => key === "discordRole")
-					.reduce((_, { value: { discordRoleId } }) => discordRoleId, null);
-				if (previousTeamDiscordRoleId != null) {
-					const discordMember = await interaction.guild.members.fetch(interaction.user.id);
-					await discordMember.roles.remove(previousTeamDiscordRoleId);
-				}
-				// remove role if empty
-				const previousTeamMemberIds = [...await getEvents(store, `/team/${previousTeamId}`)]
-					.filter(({ key }) => key === "members")
-					.reduce((memberIds, { value: { type, userId } }) => {
-						if (type === "add") {
-							memberIds.push(userId);
-						} else if (type == "remove") {
-							const index = memberIds.lastIndexOf(userId);
-							if (index !== -1)
-								memberIds.splice(index, 1);
-						}
-						return memberIds;
-				}, []);
-				if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
-					await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
-					await appendEvent(store, `/teams`, "teams", {
-						type: "remove",
-						teamId: previousTeamId,
-						reason: `last member ${displayName} left`,
-					});
-				}
 			}
 			// join team
-			await appendEvent(store, `/team/${targetTeamId}`, "members", {
-				type: "add",
-				userId: targetUserId,
-				reason: (previousTeamId == null)
-					? `joining new team by ${displayName}`
-					: `changing teams from ${previousTeamId} by ${displayName}`,
+			await modify(store, `/team/${targetTeamId}`, data => {
+				data.memberIds = data.memberIds || [];
+				data.memberIds.push(targetUserId);
 			});
-			await appendEvent(store, `/user/${targetUserId}`, "team", {
-				teamId: targetTeamId,
-				reason: (previousTeamId == null)
-					? `joining new team by ${displayName}`
-					: `changing teams from ${previousTeamId} by ${displayName}`,
+			await modify(store, `/user/${targetUserId}`, data => {
+				data.teamId = targetTeamId;
 			});
 			// create role if necessary
-			let targetTeamDiscordRoleId = [...await getEvents(store, `/team/${targetTeamId}`)]
-				.filter(({ key }) => key === "discordRole")
-				.reduce((_, { value: { discordRoleId } }) => discordRoleId, null);
+			let targetTeamDiscordRoleId = (await get(store, `/team/${targetTeamId}`)).discordRoleId;
 			if (targetTeamDiscordRoleId == null) {
 				const role = await interaction.guild.roles.create({ name: `Team ${name}` })
 				targetTeamDiscordRoleId = role.id
-				await appendEvent(store, `/team/${targetTeamId}`, "discordRole", {
-					discordRoleId: role.id,
-					reason: `created by ${displayName}`,
+				await modify(store, `/team/${targetTeamId}`, data => {
+					data.discordRoleId = role.id;
 				});
 			}
 			// join role
@@ -254,66 +207,44 @@ client.on("interactionCreate", async interaction => {
 			return;
 		}
 		if (subcommandName === "leave") {
+			console.log([ "team", "leave", metadata ]);
 			await interaction.deferReply();
 			// get user
-			const userIds = await getUserIds(store);
+			const userIds = (await get(store, `/users`)).userIds || [];
 			const userId = await findPredicate(userIds, async userId => {
-				return interaction.user.id === [...await getEvents(store, `/user/${userId}`)]
-					.filter(({ key }) => key === "discordUser")
-					.reduce((_, { value: { discordUserId } }) => discordUserId, null);
-			})
+				return interaction.user.id === (await get(store, `/user/${userId}`)).discordUserId;
+			});
 			let previousTeamId;
 			let teamName;
 			// get previous team if user exists
 			if (userId != null) {
-				previousTeamId = [...await getEvents(store, `/user/${userId}`)]
-					.filter(({ key }) => key === "team")
-					.reduce((_, { value: { teamId } }) => teamId, null);
+				previousTeamId = (await get(store, `/user/${userId}`)).teamId;
 				// leave previous team if has one
 				if (previousTeamId != null) {
-					teamName = [...await getEvents(store, `/team/${previousTeamId}`)]
-						.filter(({ key }) => key === "name")
-						.reduce((_, { value: { name } }) => name, null);
-					await appendEvent(store, `/team/${previousTeamId}`, "members", {
-						type: "remove",
-						userId: userId,
-						reason: `leaving team by ${displayName}`,
+					teamName = (await get(store, `/team/${previousTeamId}`)).name;
+					await modify(store, `/team/${previousTeamId}`, data => {
+						data.memberIds = data.memberIds || [];
+						removeFromArray(data.memberIds, userId);
 					});
-					await appendEvent(store, `/user/${userId}`, "team", {
-						teamId: null,
-						reason: `leaving team by ${displayName}`,
+					await modify(store, `/user/${userId}`, data => {
+						data.teamId = undefined;
 					});
 					// leave role
-					const previousTeamDiscordRoleId = [...await getEvents(store, `/team/${previousTeamId}`)]
-						.filter(({ key }) => key === "discordRole")
-						.reduce((_, { value: { discordRoleId } }) => discordRoleId, null);
+					const previousTeamDiscordRoleId = (await get(store, `/team/${previousTeamId}`)).discordRoleId;
 					if (previousTeamDiscordRoleId != null) {
 						const discordMember = await interaction.guild.members.fetch(interaction.user.id);
 						await discordMember.roles.remove(previousTeamDiscordRoleId);
 					}
 					// remove role if empty
-					const previousTeamMemberIds = [...await getEvents(store, `/team/${previousTeamId}`)]
-						.filter(({ key }) => key === "members")
-						.reduce((memberIds, { value: { type, userId } }) => {
-							if (type === "add") {
-								memberIds.push(userId);
-							} else if (type == "remove") {
-								const index = memberIds.lastIndexOf(userId);
-								if (index !== -1)
-									memberIds.splice(index, 1);
-							}
-							return memberIds;
-					}, []);
+					const previousTeamMemberIds = (await get(store, `/team/${previousTeamId}`)).memberIds;
 					if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
 						await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
-						await appendEvent(store, `/teams`, "teams", {
-							type: "remove",
-							teamId: previousTeamId,
-							reason: `last member ${displayName} left`,
+						await modify(store, `/teams`, data => {
+							data.teamIds = data.teamIds || [];
+							removeFromArray(data.teamIds, previousTeamId);
 						});
-						await appendEvent(store, `/team/${previousTeamId}`, "discordRole", {
-							discordRoleId: null,
-							reason: `last member ${displayName} left`,
+						await modify(store, `/team/${previousTeamId}`, data => {
+							data.discordRoleId = undefined;
 						});
 					}
 				}
@@ -326,32 +257,26 @@ client.on("interactionCreate", async interaction => {
 			return;
 		}
 		if (subcommandName === "rename") {
-			await interaction.deferReply();
 			const name = interaction.options.getString("name", true);
+			console.log([ "team", "rename", name, metadata ]);
+			await interaction.deferReply();
 			// get user
-			const userIds = await getUserIds(store);
+			const userIds = (await get(store, `/users`)).userIds || [];
 			const userId = await findPredicate(userIds, async userId => {
-				return interaction.user.id === [...await getEvents(store, `/user/${userId}`)]
-					.filter(({ key }) => key === "discordUser")
-					.reduce((_, { value: { discordUserId } }) => discordUserId, null);
-			})
+				return interaction.user.id === (await get(store, `/user/${userId}`)).discordUserId;
+			});
 			// get previous team if user exists
 			let teamId = undefined;
 			if (userId != null) {
-				teamId = [...await getEvents(store, `/user/${userId}`)]
-					.filter(({ key }) => key === "team")
-					.reduce((_, { value: { teamId } }) => teamId, null);
+				teamId = (await get(store, `/user/${userId}`)).teamId;
 				// rename previous team if has one
 				if (teamId != null) {
-					await appendEvent(store, `/team/${teamId}`, "name", {
-						name: name,
-						reason: `renamed by ${displayName}`,
+					await modify(store, `/team/${teamId}`, data => {
+						data.name = name;
 					});
 				}
 				// rename role if exists
-				const teamDiscordRoleId = [...await getEvents(store, `/team/${teamId}`)]
-					.filter(({ key }) => key === "discordRole")
-					.reduce((_, { value: { discordRoleId } }) => discordRoleId, null);
+				const teamDiscordRoleId = (await get(store, `/team/${teamId}`)).discordRoleId;
 				if (teamDiscordRoleId != null) {
 					await (await interaction.guild.roles.fetch(teamDiscordRoleId)).edit({ name: `Team ${name}` })
 				}
