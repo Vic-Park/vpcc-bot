@@ -47,7 +47,7 @@ const commands = [
 			},
 			{
 				name: "join",
-				description: "Joins a team and creates one if it doesn't exist",
+				description: "Joins a team",
 				type: 1,  // SUB_COMMAND
 				options: [
 					{

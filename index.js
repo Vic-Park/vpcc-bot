@@ -258,25 +258,12 @@ client.on("interactionCreate", async interaction => {
 			let targetUserId = await findPredicate(userIds, async userId => {
 				return interaction.user.id === await getProperty(store, `/user/${userId}`, "discordUserId");
 			});
-			// leave previous team if exists and has one
+			// fail if user exists and has a previous team
 			if (targetUserId != null) {
 				let previousTeamId = await getProperty(store, `/user/${targetUserId}`, "teamId");
 				if (previousTeamId != null) {
-					await modifyArray(store, `/team/${previousTeamId}`, "memberIds", array => removeFromArray(array, targetUserId));
-					await setProperty(store, `/user/${targetUserId}`, "teamId", undefined);
-					// leave role
-					const previousTeamDiscordRoleId = await getProperty(store, `/team/${previousTeamId}`, "discordRoleId");
-					if (previousTeamDiscordRoleId != null) {
-						const discordMember = await interaction.guild.members.fetch(interaction.user.id);
-						await discordMember.roles.remove(previousTeamDiscordRoleId);
-					}
-					// remove team if empty
-					const previousTeamMemberIds = await getArray(store, `/team/${previousTeamId}`, "memberIds");
-					if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
-						await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
-						await modifyArray(store, `/teams`, "teamIds", array => removeFromArray(array, previousTeamId));
-						await set(store, `/team/${previousTeamId}`, {});
-					}
+					await interaction.editReply(`You are still in a team`);
+					return;
 				}
 			}
 			// create user if necessary
@@ -285,18 +272,14 @@ client.on("interactionCreate", async interaction => {
 				await modifyArray(store, `/users`, "userIds", array => array.push(targetUserId));
 				await setProperty(store, `/user/${targetUserId}`, "discordUserId", interaction.user.id);
 			}
-			// find team
+			// fail if team doesnt exist
 			const teamIds = await getArray(store, "/teams", "teamIds");
 			let targetTeamId = await findPredicate(teamIds, async teamId => {
 				return name === await getProperty(store, `/team/${teamId}`, "name");
 			});
-			// create team if necessary
-			let createdNewTeam = false;
 			if (targetTeamId == null) {
-				createdNewTeam = true;
-				targetTeamId = interaction.id;
-				await modifyArray(store, `/teams`, "teamIds", array => array.push(targetTeamId));
-				await setProperty(store, `/team/${targetTeamId}`, "name", name);
+				await interaction.editReply(`Team called ${name} doesn't exist`);
+				return;
 			}
 			// join team
 			await modifyArray(store, `/team/${targetTeamId}`, "memberIds", array => array.push(targetUserId));
@@ -312,10 +295,7 @@ client.on("interactionCreate", async interaction => {
 			const discordMember = await interaction.guild.members.fetch(interaction.user.id);
 			await discordMember.roles.add(targetTeamDiscordRoleId);
 			// reply to interaction
-			await interaction.editReply(createdNewTeam
-				? `Created and joined new team called ${name}`
-				: `Joined team called ${name}`
-			);
+			await interaction.editReply(`Joined team called ${name}`);
 			return;
 		}
 		if (subcommandName === "leave") {
