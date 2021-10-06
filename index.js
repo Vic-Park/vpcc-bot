@@ -56,6 +56,8 @@ const store = {
 	},
 };
 
+// - Wrapper functions over JSON encoded values
+
 async function get(store, resource) {
 	const raw = await store.get(resource);
 	if (raw === "") return {};
@@ -73,12 +75,14 @@ async function modify(store, resource, callback) {
 	await set(store, resource, data);
 }
 
+// Helper function to remove an element from an array
 function removeFromArray(array, element) {
 	const index = array.lastIndexOf(element);
 	if (index !== -1)
 		array.splice(index, 1);
 }
 
+// Asynchronous version of Array.prototype.find
 async function findPredicate(array, predicate) {
 	for (let i = 0; i < array.length; i++) {
 		if (await predicate(array[i], i, array)) {
