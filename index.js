@@ -199,12 +199,11 @@ client.on("interactionCreate", async interaction => {
 			const name = interaction.options.getString("name", true);
 			console.log([ "team", "create", name, metadata ]);
 			await interaction.deferReply();
-			// find team
+			// fail if team exists
 			const teamIds = await getArray(store, `/teams`, "teamIds");
 			let otherTeamId = await findPredicate(teamIds, async teamId => {
 				return name === await getProperty(store, `/team/${teamId}`, "name");
 			});
-			// fail if team exists
 			if (otherTeamId != null) {
 				await interaction.editReply(`Team called ${name} already exists`);
 				return;
@@ -322,81 +321,79 @@ client.on("interactionCreate", async interaction => {
 		if (subcommandName === "leave") {
 			console.log([ "team", "leave", metadata ]);
 			await interaction.deferReply();
-			// get user
+			// fail if user doesnt exist
 			const userIds = await getArray(store, `/users`, "userIds");
 			const userId = await findPredicate(userIds, async userId => {
 				return interaction.user.id === await getProperty(store, `/user/${userId}`, "discordUserId");
 			});
-			let previousTeamId;
-			let teamName;
-			// get previous team if user exists
-			if (userId != null) {
-				previousTeamId = await getProperty(store, `/user/${userId}`, "teamId");
-				// leave previous team if has one
-				if (previousTeamId != null) {
-					teamName = await getProperty(store, `/team/${previousTeamId}`, "name");
-					await modifyArray(store, `/team/${previousTeamId}`, "memberIds", array => removeFromArray(array, userId));
-					await setProperty(store, `/user/${userId}`, "teamId", undefined);
-					// leave role
-					const previousTeamDiscordRoleId = await getProperty(store, `/team/${previousTeamId}`, "discordRoleId");
-					if (previousTeamDiscordRoleId != null) {
-						const discordMember = await interaction.guild.members.fetch(interaction.user.id);
-						await discordMember.roles.remove(previousTeamDiscordRoleId);
-					}
-					// remove team if empty
-					const previousTeamMemberIds = await getArray(store, `/team/${previousTeamId}`, "memberIds");
-					if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
-						await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
-						await modifyArray(store, `/teams`, "teamIds", array => removeFromArray(array, previousTeamId));
-						await set(store, `/team/${previousTeamId}`, {});
-					}
-				}
+			if (userId == null) {
+				await interaction.editReply(`You are not in a team`);
+				return;
+			}
+			// fail if doesnt have a previous team
+			const previousTeamId = await getProperty(store, `/user/${userId}`, "teamId");
+			if (previousTeamId == null) {
+				await interaction.editReply(`You are not in a team`);
+				return;
+			}
+			// leave previous team
+			const teamName = await getProperty(store, `/team/${previousTeamId}`, "name");
+			await modifyArray(store, `/team/${previousTeamId}`, "memberIds", array => removeFromArray(array, userId));
+			await setProperty(store, `/user/${userId}`, "teamId", undefined);
+			// leave role
+			const previousTeamDiscordRoleId = await getProperty(store, `/team/${previousTeamId}`, "discordRoleId");
+			if (previousTeamDiscordRoleId != null) {
+				const discordMember = await interaction.guild.members.fetch(interaction.user.id);
+				await discordMember.roles.remove(previousTeamDiscordRoleId);
+			}
+			// remove team if empty
+			const previousTeamMemberIds = await getArray(store, `/team/${previousTeamId}`, "memberIds");
+			if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
+				await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
+				await modifyArray(store, `/teams`, "teamIds", array => removeFromArray(array, previousTeamId));
+				await set(store, `/team/${previousTeamId}`, {});
 			}
 			// reply to interaction
-			await interaction.editReply((userId == null || previousTeamId == null)
-				? `You are not in a team`
-				: `Left team called ${teamName}`
-			);
+			await interaction.editReply(`Left team called ${teamName}`);
 			return;
 		}
 		if (subcommandName === "rename") {
 			const name = interaction.options.getString("name", true);
 			console.log([ "team", "rename", name, metadata ]);
 			await interaction.deferReply();
-			// get user
+			// fail if user doesnt exist
 			const userIds = await getArray(store, `/users`, "userIds");
 			const userId = await findPredicate(userIds, async userId => {
 				return interaction.user.id === await getProperty(store, `/user/${userId}`, "discordUserId");
 			});
-			// if user exists...
-			let teamId = undefined;
-			if (userId != null) {
-				// fail if team with same name exists
-				const teamIds = await getArray(store, "/teams", "teamIds");
-				let otherTeamId = await findPredicate(teamIds, async teamId => {
-					return name === await getProperty(store, `/team/${teamId}`, "name");
-				});
-				if (otherTeamId != null) {
-					await interaction.editReply(`Another team called ${name} exists`);
-					return;
-				}
-				// get previous team
-				teamId = await getProperty(store, `/user/${userId}`, "teamId");
-				// rename previous team if has one
-				if (teamId != null) {
-					await setProperty(store, `/team/${teamId}`, "name", name);
-				}
-				// rename role if exists
-				const teamDiscordRoleId = await getProperty(store, `/team/${teamId}`, "discordRoleId");
-				if (teamDiscordRoleId != null) {
-					await (await interaction.guild.roles.fetch(teamDiscordRoleId)).edit({ name: `Team ${name}` })
-				}
+			if (userId == null) {
+				await interaction.editReply(`You are not in a team`);
+				return;
+			}
+			// fail if team with same name exists
+			const teamIds = await getArray(store, "/teams", "teamIds");
+			let otherTeamId = await findPredicate(teamIds, async teamId => {
+				return name === await getProperty(store, `/team/${teamId}`, "name");
+			});
+			if (otherTeamId != null) {
+				await interaction.editReply(`Another team called ${name} exists`);
+				return;
+			}
+			// fail if doesnt have a previous team
+			const teamId = await getProperty(store, `/user/${userId}`, "teamId");
+			if (teamId == null) {
+				await interaction.editReply(`You are not in a team`);
+				return;
+			}
+			// rename previous team
+			await setProperty(store, `/team/${teamId}`, "name", name);
+			// rename role if exists
+			const teamDiscordRoleId = await getProperty(store, `/team/${teamId}`, "discordRoleId");
+			if (teamDiscordRoleId != null) {
+				await (await interaction.guild.roles.fetch(teamDiscordRoleId)).edit({ name: `Team ${name}` })
 			}
 			// reply to interaction
-			await interaction.editReply((userId == null || teamId == null)
-				? `You are not in a team`
-				: `Renamed team to ${name}`
-			);
+			await interaction.editReply(`Renamed team to ${name}`);
 			return;
 		}
 	}
