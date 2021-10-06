@@ -3,7 +3,7 @@
 require("dotenv").config();
 
 const fs = require("fs");
-const { Client, Intents } = require("discord.js");
+const { Client, Intents, CategoryChannel, Permissions } = require("discord.js");
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS ] });
 
 client.on("ready", () => {
@@ -170,6 +170,22 @@ async function createTeam(guild, store, teamId, properties) {
 	const teamName = await getProperty(store, `/team/${teamId}`, "name");
 	const role = await guild.roles.create({ name: `Team ${teamName}` });
 	await setProperty(store, `/team/${teamId}`, "discordRoleId", role.id);
+	// create team text and voice channels
+	const teamCategory = (await guild.channels.fetch()).find(channel => (
+		channel instanceof CategoryChannel 
+		&& channel.name.toLowerCase() === "team"
+	));
+	const channelOptions = {
+		parent: teamCategory,
+		permissionOverwrites: [
+			{ id: guild.roles.everyone, deny: [ Permissions.FLAGS.VIEW_CHANNEL ] },
+			{ id: role, allow: [ Permissions.FLAGS.VIEW_CHANNEL ] },
+		],
+	};
+	const textChannel = await guild.channels.create(`Team ${teamName}`, channelOptions);
+	const voiceChannel = await guild.channels.create(`Team ${teamName}`, { type: "GUILD_VOICE", ...channelOptions });
+	await setProperty(store, `/team/${teamId}`, "discordTextChannelId", textChannel.id);
+	await setProperty(store, `/team/${teamId}`, "discordVoiceChannelId", voiceChannel.id);
 	return teamId;
 }
 
@@ -191,6 +207,13 @@ async function renameTeam(guild, store, teamId, name) {
 	const teamDiscordRoleId = await getProperty(store, `/team/${teamId}`, "discordRoleId");
 	const role = await guild.roles.fetch(teamDiscordRoleId);
 	await role.edit({ name: `Team ${name}` });
+	// rename team channels
+	const textChannelId = await getProperty(store, `/team/${teamId}`, "discordTextChannelId");
+	const voiceChannelId = await getProperty(store, `/team/${teamId}`, "discordVoiceChannelId");
+	const textChannel = await guild.channels.fetch(textChannelId);
+	const voiceChannel = await guild.channels.fetch(voiceChannelId);
+	await textChannel.edit({ name: `Team ${name}` });
+	await voiceChannel.edit({ name: `Team ${name}` });
 }
 
 async function leaveTeam(guild, store, userId) {
@@ -206,6 +229,13 @@ async function leaveTeam(guild, store, userId) {
 }
 
 async function destroyTeam(guild, store, teamId) {
+	// remove team channels
+	const textChannelId = await getProperty(store, `/team/${teamId}`, "discordTextChannelId");
+	const voiceChannelId = await getProperty(store, `/team/${teamId}`, "discordVoiceChannelId");
+	const textChannel = await guild.channels.fetch(textChannelId);
+	const voiceChannel = await guild.channels.fetch(voiceChannelId);
+	await textChannel.delete();
+	await voiceChannel.delete();
 	// remove team role
 	const teamDiscordRoleId = await getProperty(store, `/team/${teamId}`, "discordRoleId");
 	const role = await guild.roles.fetch(teamDiscordRoleId);
