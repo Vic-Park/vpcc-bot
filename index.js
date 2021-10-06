@@ -234,7 +234,7 @@ client.on("interactionCreate", async interaction => {
 			await setProperty(store, `/team/${teamId}`, "name", name);
 			// join team
 			await modifyArray(store, `/team/${teamId}`, "memberIds", array => array.push(userId));
-			await modify(store, `/user/${userId}`, "teamId", teamId);
+			await setProperty(store, `/user/${userId}`, "teamId", teamId);
 			// create role if necessary
 			let teamDiscordRoleId = await getProperty(store, `/team/${teamId}`, "discordRoleId");
 			if (teamDiscordRoleId == null) {
@@ -343,12 +343,12 @@ client.on("interactionCreate", async interaction => {
 						const discordMember = await interaction.guild.members.fetch(interaction.user.id);
 						await discordMember.roles.remove(previousTeamDiscordRoleId);
 					}
-					// remove role if empty
+					// remove team if empty
 					const previousTeamMemberIds = await getArray(store, `/team/${previousTeamId}`, "memberIds");
 					if (previousTeamDiscordRoleId != null && previousTeamMemberIds.length === 0) {
 						await (await interaction.guild.roles.fetch(previousTeamDiscordRoleId)).delete();
 						await modifyArray(store, `/teams`, "teamIds", array => removeFromArray(array, previousTeamId));
-						await setProperty(store, `/team/${previousTeamId}`, "discordRoleId", undefined);
+						await set(store, `/team/${previousTeamId}`, {});
 					}
 				}
 			}
