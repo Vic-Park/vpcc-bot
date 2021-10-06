@@ -368,9 +368,19 @@ client.on("interactionCreate", async interaction => {
 			const userId = await findPredicate(userIds, async userId => {
 				return interaction.user.id === await getProperty(store, `/user/${userId}`, "discordUserId");
 			});
-			// get previous team if user exists
+			// if user exists...
 			let teamId = undefined;
 			if (userId != null) {
+				// fail if team with same name exists
+				const teamIds = await getArray(store, "/teams", "teamIds");
+				let otherTeamId = await findPredicate(teamIds, async teamId => {
+					return name === await getProperty(store, `/team/${teamId}`, "name");
+				});
+				if (otherTeamId != null) {
+					await interaction.editReply(`Another team called ${name} exists`);
+					return;
+				}
+				// get previous team
 				teamId = await getProperty(store, `/user/${userId}`, "teamId");
 				// rename previous team if has one
 				if (teamId != null) {
