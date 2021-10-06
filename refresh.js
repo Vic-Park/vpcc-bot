@@ -33,6 +33,19 @@ const commands = [
 		description: "Manage teams",
 		options: [
 			{
+				name: "create",
+				description: "Creates and joins a new team",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "name",
+						description: "Name of team",
+						type: 3,  // STRING
+						required: true,
+					},
+				],
+			},
+			{
 				name: "join",
 				description: "Joins a team and creates one if it doesn't exist",
 				type: 1,  // SUB_COMMAND

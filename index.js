@@ -161,6 +161,77 @@ client.on("interactionCreate", async interaction => {
 
 	if (interaction.commandName === "team") {
 		const subcommandName = interaction.options.getSubcommand(true);
+		if (subcommandName === "create") {
+			const name = interaction.options.getString("name", true);
+			console.log([ "team", "create", name, metadata ]);
+			await interaction.deferReply();
+			// find team
+			const teamIds = (await get(store, `/teams`)).teamIds || [];
+			let otherTeamId = await findPredicate(teamIds, async teamId => {
+				return name === (await get(store, `/team/${teamId}`)).name;
+			});
+			// fail if team exists
+			if (otherTeamId != null) {
+				await interaction.editReply(`Team called ${name} already exists`);
+				return;
+			}
+			// find user
+			const userIds = (await get(store, "/users")).userIds || [];
+			let userId = await findPredicate(userIds, async userId => {
+				return interaction.user.id === (await get(store, `/user/${userId}`)).discordUserId;
+			});
+			// fail if user exists and has a previous team
+			if (userId != null) {
+				let previousTeamId = (await get(store, `/user/${userId}`)).teamId;
+				if (previousTeamId != null) {
+					await interaction.editReply(`You are still in a team`);
+					return;
+				}
+			}
+			// create user if necessary
+			if (userId == null) {
+				userId = interaction.id;
+				await modify(store, `/users`, data => {
+					data.userIds = data.userIds || [];
+					data.userIds.push(userId);
+				});
+				await modify(store, `/user/${userId}`, data => {
+					data.discordUserId = interaction.user.id;
+				});
+			}
+			// create team
+			const teamId = interaction.id;
+			await modify(store, `/teams`, data => {
+				data.teamIds = data.teamIds || [];
+				data.teamIds.push(teamId);
+			});
+			await modify(store, `/team/${teamId}`, data => {
+				data.name = name;
+			});
+			// join team
+			await modify(store, `/team/${teamId}`, data => {
+				data.memberIds = data.memberIds || [];
+				data.memberIds.push(userId);
+			});
+			await modify(store, `/user/${userId}`, data => {
+				data.teamId = teamId;
+			});
+			// create role if necessary
+			let teamDiscordRoleId = (await get(store, `/team/${teamId}`)).discordRoleId;
+			if (teamDiscordRoleId == null) {
+				const role = await interaction.guild.roles.create({ name: `Team ${name}` })
+				teamDiscordRoleId = role.id
+				await modify(store, `/team/${teamId}`, data => {
+					data.discordRoleId = role.id;
+				});
+			}
+			// join role
+			const discordMember = await interaction.guild.members.fetch(interaction.user.id);
+			await discordMember.roles.add(teamDiscordRoleId);
+			// reply to interaction
+			await interaction.editReply(`Created and joined new team called ${name}`);
+			return;
+		}
 		if (subcommandName === "join") {
 			const name = interaction.options.getString("name", true);
 			console.log([ "team", "join", name, metadata ]);
