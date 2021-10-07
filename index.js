@@ -65,8 +65,9 @@ async function get(store, resource) {
 }
 
 async function set(store, resource, data) {
-	if (Object.keys(data).length === 0) return await store.set(resource, "");
-	return await store.set(resource, JSON.stringify(data));
+	const raw = JSON.stringify(data);
+	if (raw === "{}") return await store.set(resource, "");
+	return await store.set(resource, raw);
 }
 
 async function modify(store, resource, callback) {
