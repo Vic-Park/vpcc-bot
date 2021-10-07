@@ -4,7 +4,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 const NodeCache = require("node-cache");
-const { Client, Intents, CategoryChannel, Permissions } = require("discord.js");
+const { Client, Intents, CategoryChannel, Permissions, User } = require("discord.js");
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS ], rejectOnRateLimit: () => true });
 
 client.on("ready", () => {
@@ -158,6 +158,10 @@ const resources = {
 		obj.resource = undefined;
 		this.cache.del(resource);
 		return await set(this.store, resource, obj);
+	},
+	// invalidate the cache
+	invalidate: async function() {
+		this.cache.flushAll();
 	},
 };
 
@@ -355,6 +359,67 @@ client.on("interactionCreate", async interaction => {
 		if (interaction.commandName === "ping") {
 			await interaction.editReply("pong");
 			return;
+		}
+
+		if (interaction.commandName === "admin") {
+			const owner = (await client.application.fetch()).owner;
+			const userId = interaction.user.id;
+			console.log(owner);
+			if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
+				await interaction.editReply(`You are still in a team`);
+				return;
+			}
+			const subcommandName = interaction.options.getSubcommand(true);
+			if (subcommandName === "get") {
+				const key = interaction.options.getString("key", true);
+				console.log([ "admin", "get", key, metadata ]);
+				const [resource, ...properties] = key.split(".");
+				let result = await resources.fetch(resource.trim());
+				for (const property of properties)
+					result = result?.[property.trim()];
+				let out;
+				if (result === undefined)
+					out = "*undefined*";
+				else {
+					const stringified = JSON.stringify(result, null, 2);
+					if (stringified.includes("\n"))
+						out = "```json\n" + stringified + "\n```";
+					else
+						out = "`" + stringified + "`";
+				}
+				await interaction.editReply(out);
+				return;
+			}
+			if (subcommandName === "set") {
+				const key = interaction.options.getString("key", true);
+				const value = interaction.options.getString("value", true);
+				console.log([ "admin", "set", key, value, metadata ]);
+				const transaction = createTransaction(resources);
+				const [resource, ...properties] = key.split(".");
+				const last = properties.pop();
+				let result = await transaction.fetch({ resource: resource.trim(), edit: true });
+				for (const property of properties)
+					result = result?.[property.trim()];
+				if (result === undefined)
+					throw new Error("cannot set property of undefined");
+				if (last === undefined) {
+					const v = Object.assign({}, result);  // for use in the eval
+					clearResource(result);
+					Object.assign(result, eval(`(${value})`));
+				} else {
+					const v = result[last] === undefined ? undefined : JSON.parse(JSON.stringify(result[last]));
+					result[last] = eval(`(${value})`);
+				}
+				await transaction.commit();
+				await interaction.editReply("*updated*");
+				return;
+			}
+			if (subcommandName === "invalidate") {
+				console.log([ "admin", "invalidate", metadata ]);
+				await resources.invalidate();
+				await interaction.editReply("*invalidated*");
+				return;
+			}
 		}
 
 		if (interaction.commandName === "profile") {

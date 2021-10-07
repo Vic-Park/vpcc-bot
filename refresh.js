@@ -11,6 +11,49 @@ const commands = [
 		description: "Replies with pong",
 	},
 	{
+		name: "admin",
+		description: "Bot owner only commands",
+		options: [
+			{
+				name: "get",
+				description: "Retrieves a resource's property",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "key",
+						description: "Resource and property to locate",
+						type: 3,  // STRING
+						required: true,
+					},
+				],
+			},
+			{
+				name: "set",
+				description: "Updates a resource's property",
+				type: 1,  // SUB_COMMAND
+				options: [
+					{
+						name: "key",
+						description: "Resource and property to locate",
+						type: 3,  // STRING
+						required: true,
+					},
+					{
+						name: "value",
+						description: "New value",
+						type: 3,  // STRING
+						required: true,
+					},
+				],
+			},
+			{
+				name: "invalidate",
+				description: "Invalidates the cache",
+				type: 1,  // SUB_COMMAND
+			},
+		],
+	},
+	{
 		name: "profile",
 		description: "Shows a summary of your profile",
 		options: [
