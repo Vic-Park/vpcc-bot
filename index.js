@@ -301,14 +301,14 @@ async function joinTeam(guild, _resources, team, user) {
 async function renameTeam(guild, _resources, team, name) {
 	// rename team
 	team.name = name;
-	// rename role
-	const role = await guild.roles.fetch(team.discordRoleId);
-	await role.edit({ name: `Team ${name}` });
 	// rename team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
 	await textChannel.edit({ name: `Team ${name}` });
 	await voiceChannel.edit({ name: `Team ${name}` });
+	// rename role
+	const role = await guild.roles.fetch(team.discordRoleId);
+	await role.edit({ name: `Team ${name}` });
 }
 
 async function leaveTeam(guild, resources, user) {
