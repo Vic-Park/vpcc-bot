@@ -5,7 +5,7 @@ require("dotenv").config();
 const fs = require("fs");
 const NodeCache = require("node-cache");
 const { Client, Intents, CategoryChannel, Permissions } = require("discord.js");
-const client = new Client({ intents: [ Intents.FLAGS.GUILDS ] });
+const client = new Client({ intents: [ Intents.FLAGS.GUILDS ], rejectOnRateLimit: () => true });
 
 client.on("ready", () => {
 	console.log(`Logged in as ${client.user.tag}`);
