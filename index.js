@@ -366,7 +366,7 @@ client.on("interactionCreate", async interaction => {
 			const userId = interaction.user.id;
 			console.log(owner);
 			if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
-				await interaction.editReply(`You are still in a team`);
+				await interaction.editReply(`You are not the bot owner`);
 				return;
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
