@@ -101,7 +101,7 @@ function createTransaction(resources) {
 		},
 		// pushes all changes and clears data
 		commit: async function() {
-			for (const resource of Object.keys(this.data)) {
+			for (const resource in this.data) {
 				// future: check if something actually changed before pushing
 				await this.resources.push(this.data[resource]);
 				delete this.data[resource];
@@ -118,17 +118,12 @@ function clearObject(obj) {
 
 // find user with matching requirements
 async function findUser(resources, requirements, edit = false) {
+	users:
 	for (const userId of (await resources.fetch(`/users`)).userIds ?? []) {
 		let user = await resources.fetch(`/user/${userId}`);
-		let ok = true;
-		for (const name in requirements) {
-			if (requirements[name] !== user[name]) {
-				ok = false;
-				break;
-			}
-		}
-		if (!ok)
-			continue;
+		for (const name in requirements)
+			if (requirements[name] !== user[name])
+				continue users;
 		if (!edit)
 			user = Object.assign({}, user);
 		else
@@ -141,17 +136,12 @@ async function findUser(resources, requirements, edit = false) {
 
 // find team with matching requirements
 async function findTeam(resources, requirements, edit = false) {
+	teams:
 	for (const teamId of (await resources.fetch(`/teams`)).teamIds ?? []) {
 		let team = await resources.fetch(`/team/${teamId}`);
-		let ok = true;
-		for (const name in requirements) {
-			if (requirements[name] !== team[name]) {
-				ok = false;
-				break;
-			}
-		}
-		if (!ok)
-			continue;
+		for (const name in requirements)
+			if (requirements[name] !== team[name])
+				continue teams;
 		if (!edit)
 			team = Object.assign({}, team);
 		else
@@ -176,18 +166,18 @@ async function fetchTeam(resources, teamId, edit = false) {
 	return team;
 }
 
-async function createUser(_guild, resources, properties) {
+async function createUser(_guild, resources, { id, ...properties }) {
 	const users = await resources.fetch({ resource: `/users`, edit: true });
-	const user = await fetchUser(resources, properties.id, true);
+	const user = await fetchUser(resources, id, true);
 	// create user with properties
 	Object.assign(user, properties);
 	(users.userIds ??= []).push(user.id);
 	return user;
 }
 
-async function createTeam(guild, resources, properties) {
+async function createTeam(guild, resources, { id, ...properties }) {
 	const teams = await resources.fetch({ resource: `/teams`, edit: true });
-	const team = await fetchTeam(resources, properties.id, true);
+	const team = await fetchTeam(resources, id, true);
 	// create team with properties
 	Object.assign(team, properties);
 	(teams.teamIds ??= []).push(team.id);
