@@ -117,17 +117,13 @@ function clearObject(obj) {
 }
 
 // find user with matching requirements
-async function findUser(resources, requirements, edit = false) {
+async function findUser(resources, requirements) {
 	users:
 	for (const userId of (await resources.fetch(`/users`)).userIds ?? []) {
 		let user = await resources.fetch(`/user/${userId}`);
 		for (const name in requirements)
 			if (requirements[name] !== user[name])
 				continue users;
-		if (!edit)
-			user = Object.assign({}, user);
-		else
-			user = await resources.fetch({ resource: `/user/${userId}`, edit });
 		user.id ??= userId;
 		return user;
 	}
@@ -135,17 +131,13 @@ async function findUser(resources, requirements, edit = false) {
 }
 
 // find team with matching requirements
-async function findTeam(resources, requirements, edit = false) {
+async function findTeam(resources, requirements) {
 	teams:
 	for (const teamId of (await resources.fetch(`/teams`)).teamIds ?? []) {
 		let team = await resources.fetch(`/team/${teamId}`);
 		for (const name in requirements)
 			if (requirements[name] !== team[name])
 				continue teams;
-		if (!edit)
-			team = Object.assign({}, team);
-		else
-			team = await resources.fetch({ resource: `/team/${teamId}`, edit });
 		team.id ??= teamId;
 		return team;
 	}
@@ -153,22 +145,22 @@ async function findTeam(resources, requirements, edit = false) {
 }
 
 // find user with id
-async function fetchUser(resources, userId, edit = false) {
-	const user = await resources.fetch({ resource: `/user/${userId}`, edit });
+async function fetchUser(resources, userId) {
+	const user = await resources.fetch(`/user/${userId}`);
 	user.id ??= userId;
 	return user;
 }
 
 // find teamId with id
-async function fetchTeam(resources, teamId, edit = false) {
-	const team = await resources.fetch({ resource: `/team/${teamId}`, edit });
+async function fetchTeam(resources, teamId) {
+	const team = await resources.fetch(`/team/${teamId}`);
 	team.id ??= teamId;
 	return team;
 }
 
 async function createUser(_guild, resources, { id, ...properties }) {
-	const users = await resources.fetch({ resource: `/users`, edit: true });
-	const user = await fetchUser(resources, id, true);
+	const users = await resources.fetch(`/users`);
+	const user = await fetchUser(resources, id);
 	// create user with properties
 	Object.assign(user, properties);
 	(users.userIds ??= []).push(user.id);
@@ -176,8 +168,8 @@ async function createUser(_guild, resources, { id, ...properties }) {
 }
 
 async function createTeam(guild, resources, { id, ...properties }) {
-	const teams = await resources.fetch({ resource: `/teams`, edit: true });
-	const team = await fetchTeam(resources, id, true);
+	const teams = await resources.fetch(`/teams`);
+	const team = await fetchTeam(resources, id);
 	// create team with properties
 	Object.assign(team, properties);
 	(teams.teamIds ??= []).push(team.id);
@@ -225,7 +217,7 @@ async function renameTeam(guild, _resources, team, name) {
 }
 
 async function leaveTeam(guild, resources, user) {
-	const team = await fetchTeam(resources, user.teamId, true);
+	const team = await fetchTeam(resources, user.teamId);
 	team.id ??= user.teamId;
 	// leave team role
 	const discordMember = await guild.members.fetch(user.discordUserId);
@@ -236,7 +228,7 @@ async function leaveTeam(guild, resources, user) {
 }
 
 async function destroyTeam(guild, resources, team) {
-	const teams = await resources.fetch({ resource: `/teams`, edit: true });
+	const teams = await resources.fetch(`/teams`);
 	// remove team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
@@ -306,7 +298,7 @@ client.on("interactionCreate", async interaction => {
 				const transaction = createTransaction(resources);
 				const [resource, ...properties] = key.split(".");
 				const last = properties.pop();
-				let result = await transaction.fetch({ resource: resource.trim(), edit: true });
+				let result = await transaction.fetch(resource.trim());
 				for (const property of properties)
 					result = result?.[property.trim()];
 				if (result === undefined)
@@ -401,7 +393,7 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				// fail if user exists and has a previous team
-				let user = await findUser(transaction, { discordUserId: interaction.user.id }, true);
+				let user = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (user != null) {
 					if (user.teamId != null) {
 						await interaction.editReply(`You are still in a team`);
@@ -427,7 +419,7 @@ client.on("interactionCreate", async interaction => {
 				// create transaction
 				const transaction = createTransaction(resources);
 				// find user
-				let user = await findUser(transaction, { discordUserId: interaction.user.id }, true);
+				let user = await findUser(transaction, { discordUserId: interaction.user.id });
 				// fail if user exists and has a previous team
 				if (user != null) {
 					if (user.teamId != null) {
@@ -440,7 +432,7 @@ client.on("interactionCreate", async interaction => {
 					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
 				}
 				// fail if team doesnt exist
-				const team = await findTeam(transaction, { name }, true);
+				const team = await findTeam(transaction, { name });
 				if (team == null) {
 					await interaction.editReply(`Team called ${name} doesn't exist`);
 					return;
@@ -456,7 +448,7 @@ client.on("interactionCreate", async interaction => {
 				console.log([ "team", "leave", metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if user doesnt exist
-				const user = await findUser(transaction, { discordUserId: interaction.user.id }, true);
+				const user = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (user == null) {
 					await interaction.editReply(`You are not in a team`);
 					return;
@@ -467,7 +459,7 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				// get team name
-				const team = await fetchTeam(transaction, user.teamId, true);
+				const team = await fetchTeam(transaction, user.teamId);
 				const teamName = team.name;
 				// leave previous team
 				await leaveTeam(interaction.guild, transaction, user);
@@ -485,7 +477,7 @@ client.on("interactionCreate", async interaction => {
 				console.log([ "team", "rename", name, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if user doesnt exist
-				const user = await findUser(transaction, { discordUserId: interaction.user.id }, true);
+				const user = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (user == null) {
 					await interaction.editReply(`You are not in a team`);
 					return;
@@ -501,7 +493,7 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				// rename previous team
-				const team = await fetchTeam(transaction, user.teamId, true);
+				const team = await fetchTeam(transaction, user.teamId);
 				await renameTeam(interaction.guild, transaction, team, name);
 				// reply to interaction
 				await transaction.commit();
