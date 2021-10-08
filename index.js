@@ -86,41 +86,6 @@ async function findPredicate(array, predicate) {
 	return undefined;
 }
 
-// - JSON specific helper functions
-
-async function getProperty(store, resource, property) {
-	return (await get(store, resource))[property];
-}
-
-async function setProperty(store, resource, property, value) {
-	return await modify(store, resource, data => {
-		data[property] = value;
-	});
-}
-
-async function getArray(store, resource, property) {
-	return (await get(store, resource))[property] || [];
-}
-
-async function setArray(store, resource, property, value) {
-	return await modify(store, resource, data => {
-		if (value != null && value.length === 0)
-			data[property] = undefined;
-		else
-			data[property] = value;
-	});
-}
-
-async function modifyArray(store, resource, property, callback) {
-	return await modify(store, resource, async data => {
-		if (data[property] == null)
-			data[property] = [];
-		await callback(data[property]);
-		if (data[property] != null && data[property].length === 0)
-			data[property] = undefined;
-	});
-}
-
 // - VPCC specific helper functions
 
 // global cache object
