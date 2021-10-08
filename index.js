@@ -4,6 +4,8 @@ require("dotenv").config();
 
 const fs = require("fs");
 const NodeCache = require("node-cache");
+const Keyv = require("keyv");
+const { KeyvFile } = require("keyv-file");
 const { Client, Intents, CategoryChannel, Permissions, User } = require("discord.js");
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS ], rejectOnRateLimit: () => true });
 
@@ -11,49 +13,39 @@ client.on("ready", () => {
 	console.log(`Logged in as ${client.user.tag}`);
 });
 
-// key value store (will be upgraded to use replit's built in key value store later)
+// keyv-file based store (will be upgraded to use replit's built in key value store later)
 const store = {
-	filename: "store.json",
+	keyv: new Keyv({
+		store: new KeyvFile({
+			filename: "store.json",
+		}),
+	}),
 	async set(key, value) {
-		let raw;
-		try {
-			raw = await fs.promises.readFile(store.filename, "utf-8");
-		} catch (e) {
-			raw = "";
-		}
-		const mapping = raw ? JSON.parse(raw) : {};
 		if (key.toString() !== "") {
 			if (value.toString() === "") {
-				mapping[key] = undefined;
+				await this.keyv.delete(key);
 			} else {
 				try {
 					const obj = JSON.parse(value);
 					if (JSON.stringify(obj) == value)
-						mapping[key] = obj;
+						await this.keyv.set(key, obj);
 					else
-						mapping[key] = value;
+						await this.keyv.set(key, value);
 				} catch (e) {
-					mapping[key] = value;
+					await this.keyv.set(key, value);
 				}
 			}
 		}
-		await fs.promises.writeFile(store.filename, JSON.stringify(mapping));
 	},
 	async get(key) {
-		let raw;
-		try {
-			raw = await fs.promises.readFile(store.filename, "utf-8");
-		} catch (e) {
-			raw = "";
-		}
-		const mapping = raw ? JSON.parse(raw) : {};
 		if (key.toString() === "")
 			return "";
-		if (mapping[key] == null)
+		const value = await this.keyv.get(key);
+		if (value == null)
 			return "";
-		if (typeof mapping[key] === "string")
-			return mapping[key];
-		return JSON.stringify(mapping[key]);
+		if (typeof value === "string")
+			return value;
+		return JSON.stringify(value);
 	},
 };
 
