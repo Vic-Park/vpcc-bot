@@ -51,7 +51,7 @@ const store = {
 			return "";
 		if (mapping[key] == null)
 			return "";
-		if (mapping[key] instanceof String)
+		if (typeof mapping[key] === "string")
 			return mapping[key];
 		return JSON.stringify(mapping[key]);
 	},
