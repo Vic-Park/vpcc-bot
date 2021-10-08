@@ -14,30 +14,27 @@ client.on("ready", () => {
 });
 
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
-const store = new Keyv({
-	store: new KeyvFile({
-		filename: "store.json",
+const store = {
+	keyv: new Keyv({
+		store: new KeyvFile({
+			filename: "store.json",
+		}),
 	}),
-});
-
-// - Wrapper functions over Keyv
-
-async function get(store, resource) {
-	return (await store.get(resource)) ?? {};
-}
-
-async function set(store, resource, data) {
-	if (JSON.stringify(data) === "{}")
-		return await store.delete(resource);
-	else
-		return await store.set(resource, data);
-}
-
-async function modify(store, resource, callback) {
-	const data = await get(store, resource);
-	await callback(data);
-	await set(store, resource, data);
-}
+	async get(resource) {
+		return (await this.keyv.get(resource)) ?? {};
+	},
+	async set(resource, data) {
+		if (JSON.stringify(data) === "{}")
+			return await this.keyv.delete(resource);
+		else
+			return await this.keyv.set(resource, data);
+	},
+	async modify(resource, callback) {
+		const data = await get(this.keyv, resource);
+		await callback(data);
+		await set(this.keyv, resource, data);
+	},
+};
 
 // Helper function to remove an element from an array
 function removeFromArray(array, element) {
@@ -70,7 +67,7 @@ const resources = {
 		if (!(options.force ?? false))
 			obj = this.cache.get(options.resource);
 		if (obj == null) {
-			obj = await get(this.store, options.resource);
+			obj = await this.store.get(options.resource);
 			if (options.cache ?? true)
 				this.cache.set(options.resource, obj);
 		}
@@ -84,7 +81,7 @@ const resources = {
 		const resource = obj.resource;
 		obj.resource = undefined;
 		this.cache.del(resource);
-		return await set(this.store, resource, obj);
+		return await this.store.set(resource, obj);
 	},
 	// invalidate the cache
 	invalidate: async function() {
