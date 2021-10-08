@@ -55,6 +55,8 @@ async function findPredicate(array, predicate) {
 
 // - VPCC specific helper functions
 
+const resourceSymbol = Symbol("resource");
+
 // global cache object
 const resources = {
 	cache: new NodeCache({ useClones: false }),
@@ -73,13 +75,12 @@ const resources = {
 		}
 		if (options.edit ?? false)
 			obj = Object.assign({}, obj);
-		obj.resource = options.resource;
+		obj[resourceSymbol] = options.resource;
 		return obj;
 	},
 	// update the resource object to the store
 	push: async function(obj) {
-		const resource = obj.resource;
-		obj.resource = undefined;
+		const resource = obj[resourceSymbol];
 		this.cache.del(resource);
 		return await this.store.set(resource, obj);
 	},
@@ -114,11 +115,10 @@ function createTransaction(resources) {
 	};
 }
 
-// removes all data from a resource (essentially deleting it)
-function clearResource(obj) {
+// deletes all values from an object
+function clearObject(obj) {
 	for (const name in obj)
-		if (name !== "resource")
-			obj[name] = undefined;
+		delete obj[name];
 }
 
 // find user with matching requirements
@@ -262,7 +262,7 @@ async function destroyTeam(guild, resources, team) {
 	await role.delete();
 	// remove team
 	removeFromArray((teams.teamIds ??= []), team.id);
-	clearResource(team);
+	clearObject(team);
 }
 
 // Process slash commands
@@ -328,7 +328,7 @@ client.on("interactionCreate", async interaction => {
 					throw new Error("cannot set property of undefined");
 				if (last === undefined) {
 					const v = Object.assign({}, result);  // for use in the eval
-					clearResource(result);
+					clearObject(result);
 					Object.assign(result, eval(`(${value})`));
 				} else {
 					const v = result[last] === undefined ? undefined : JSON.parse(JSON.stringify(result[last]));
