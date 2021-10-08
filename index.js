@@ -60,7 +60,7 @@ const resources = {
 	resourceSymbol: Symbol("resource"),
 	cache: new NodeCache({ useClones: false }),
 	store: store,
-	// call with a resource string or an object with { resource, force = false, cache = true, edit = false }
+	// call with a resource string or an object with { resource, force = false, cache = true }
 	fetch: async function(options) {
 		if (typeof options === "string")
 			options = { resource: options };
@@ -72,8 +72,7 @@ const resources = {
 			if (options.cache ?? true)
 				this.cache.set(options.resource, obj);
 		}
-		if (options.edit ?? false)
-			obj = Object.assign({}, obj);
+		obj = Object.assign({}, obj);  // always return a copy of the object
 		obj[this.resourceSymbol] = options.resource;
 		return obj;
 	},
@@ -94,14 +93,11 @@ function createTransaction(resources) {
 	return {
 		resources: resources,
 		data: {},
-		// call with a resource string or an object with { resource, edit = false } & resources.fetch.options
+		// call with a resource string or an object with resources.fetch.options
 		fetch: async function(options) {
 			if (typeof options === "string")
 				options = { resource: options };
-			const obj = this.data[options.resource] ?? await this.resources.fetch(options);
-			if (options.edit ?? false)
-				this.data[options.resource] = obj;
-			return obj;
+			return this.data[options.resource] ??= await this.resources.fetch(options);
 		},
 		// pushes all changes and clears data
 		commit: async function() {
