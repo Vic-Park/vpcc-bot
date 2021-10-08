@@ -55,10 +55,9 @@ async function findPredicate(array, predicate) {
 
 // - VPCC specific helper functions
 
-const resourceSymbol = Symbol("resource");
-
 // global cache object
 const resources = {
+	resourceSymbol: Symbol("resource"),
 	cache: new NodeCache({ useClones: false }),
 	store: store,
 	// call with a resource string or an object with { resource, force = false, cache = true, edit = false }
@@ -75,12 +74,12 @@ const resources = {
 		}
 		if (options.edit ?? false)
 			obj = Object.assign({}, obj);
-		obj[resourceSymbol] = options.resource;
+		obj[this.resourceSymbol] = options.resource;
 		return obj;
 	},
 	// update the resource object to the store
 	push: async function(obj) {
-		const resource = obj[resourceSymbol];
+		const resource = obj[this.resourceSymbol];
 		this.cache.del(resource);
 		return await this.store.set(resource, obj);
 	},
