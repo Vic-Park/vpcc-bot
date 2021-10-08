@@ -14,53 +14,23 @@ client.on("ready", () => {
 });
 
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
-const store = {
-	keyv: new Keyv({
-		store: new KeyvFile({
-			filename: "store.json",
-		}),
+const store = new Keyv({
+	store: new KeyvFile({
+		filename: "store.json",
 	}),
-	async set(key, value) {
-		if (key.toString() !== "") {
-			if (value.toString() === "") {
-				await this.keyv.delete(key);
-			} else {
-				try {
-					const obj = JSON.parse(value);
-					if (JSON.stringify(obj) == value)
-						await this.keyv.set(key, obj);
-					else
-						await this.keyv.set(key, value);
-				} catch (e) {
-					await this.keyv.set(key, value);
-				}
-			}
-		}
-	},
-	async get(key) {
-		if (key.toString() === "")
-			return "";
-		const value = await this.keyv.get(key);
-		if (value == null)
-			return "";
-		if (typeof value === "string")
-			return value;
-		return JSON.stringify(value);
-	},
-};
+});
 
-// - Wrapper functions over JSON encoded values
+// - Wrapper functions over Keyv
 
 async function get(store, resource) {
-	const raw = await store.get(resource);
-	if (raw === "") return {};
-	return JSON.parse(raw);
+	return (await store.get(resource)) ?? {};
 }
 
 async function set(store, resource, data) {
-	const raw = JSON.stringify(data);
-	if (raw === "{}") return await store.set(resource, "");
-	return await store.set(resource, raw);
+	if (JSON.stringify(data) === "{}")
+		return await store.delete(resource);
+	else
+		return await store.set(resource, data);
 }
 
 async function modify(store, resource, callback) {
