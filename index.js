@@ -109,7 +109,7 @@ function createTransaction(resources) {
 			for (const resource of Object.keys(this.data)) {
 				// future: check if something actually changed before pushing
 				await this.resources.push(this.data[resource]);
-				this.data[resource] = undefined;
+				delete this.data[resource];
 			}
 		},
 	};
