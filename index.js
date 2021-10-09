@@ -158,18 +158,18 @@ async function fetchTeam(resources, teamId) {
 	return team;
 }
 
-async function createUser(_guild, resources, { id, ...properties }) {
-	const users = await resources.fetch(`/users`);
-	const user = await fetchUser(resources, id);
+async function createUser(_guild, transaction, { id, ...properties }) {
+	const users = await transaction.fetch(`/users`);
+	const user = await fetchUser(transaction, id);
 	// create user with properties
 	Object.assign(user, properties);
 	(users.userIds ??= []).push(user.id);
 	return user;
 }
 
-async function createTeam(guild, resources, { id, ...properties }) {
-	const teams = await resources.fetch(`/teams`);
-	const team = await fetchTeam(resources, id);
+async function createTeam(guild, transaction, { id, ...properties }) {
+	const teams = await transaction.fetch(`/teams`);
+	const team = await fetchTeam(transaction, id);
 	// create team with properties
 	Object.assign(team, properties);
 	(teams.teamIds ??= []).push(team.id);
@@ -194,7 +194,7 @@ async function createTeam(guild, resources, { id, ...properties }) {
 	return team;
 }
 
-async function joinTeam(guild, _resources, team, user) {
+async function joinTeam(guild, _transaction, team, user) {
 	// join team
 	(team.memberIds ??= []).push(user.id);
 	user.teamId = team.id;
@@ -203,7 +203,7 @@ async function joinTeam(guild, _resources, team, user) {
 	await discordMember.roles.add(team.discordRoleId);
 }
 
-async function renameTeam(guild, _resources, team, name) {
+async function renameTeam(guild, _transaction, team, name) {
 	// rename team
 	team.name = name;
 	// rename team channels
@@ -216,8 +216,8 @@ async function renameTeam(guild, _resources, team, name) {
 	await role.edit({ name: `Team ${name}` });
 }
 
-async function leaveTeam(guild, resources, user) {
-	const team = await fetchTeam(resources, user.teamId);
+async function leaveTeam(guild, transaction, user) {
+	const team = await fetchTeam(transaction, user.teamId);
 	team.id ??= user.teamId;
 	// leave team role
 	const discordMember = await guild.members.fetch(user.discordUserId);
@@ -227,8 +227,8 @@ async function leaveTeam(guild, resources, user) {
 	user.teamId = undefined;
 }
 
-async function destroyTeam(guild, resources, team) {
-	const teams = await resources.fetch(`/teams`);
+async function destroyTeam(guild, transaction, team) {
+	const teams = await transaction.fetch(`/teams`);
 	// remove team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
