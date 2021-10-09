@@ -14,27 +14,30 @@ client.on("ready", () => {
 });
 
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
-const store = {
-	keyv: new Keyv({
-		store: new KeyvFile({
-			filename: "store.json",
-		}),
+function createStore(keyv) {
+	return {
+		keyv,
+		async get(resource) {
+			return (await this.keyv.get(resource)) ?? {};
+		},
+		async set(resource, data) {
+			if (JSON.stringify(data) === "{}")
+				return await this.keyv.delete(resource);
+			else
+				return await this.keyv.set(resource, data);
+		},
+		async modify(resource, callback) {
+			const data = await get(this.keyv, resource);
+			await callback(data);
+			await set(this.keyv, resource, data);
+		},
+	};
+}
+const store = createStore(new Keyv({
+	store: new KeyvFile({
+		filename: "store.json",
 	}),
-	async get(resource) {
-		return (await this.keyv.get(resource)) ?? {};
-	},
-	async set(resource, data) {
-		if (JSON.stringify(data) === "{}")
-			return await this.keyv.delete(resource);
-		else
-			return await this.keyv.set(resource, data);
-	},
-	async modify(resource, callback) {
-		const data = await get(this.keyv, resource);
-		await callback(data);
-		await set(this.keyv, resource, data);
-	},
-};
+}));
 
 // Helper function to remove an element from an array
 function removeFromArray(array, element) {
@@ -56,37 +59,40 @@ async function findPredicate(array, predicate) {
 // - VPCC specific helper functions
 
 // global cache object
-const resources = {
-	resourceSymbol: Symbol("resource"),
-	cache: new NodeCache({ useClones: false }),
-	store: store,
-	// call with a resource string or an object with { resource, force = false, cache = true }
-	fetch: async function(options) {
-		if (typeof options === "string")
-			options = { resource: options };
-		let obj;
-		if (!(options.force ?? false))
-			obj = this.cache.get(options.resource);
-		if (obj == null) {
-			obj = await this.store.get(options.resource);
-			if (options.cache ?? true)
-				this.cache.set(options.resource, obj);
-		}
-		obj = Object.assign({}, obj);  // always return a copy of the object
-		obj[this.resourceSymbol] = options.resource;
-		return obj;
-	},
-	// update the resource object to the store
-	push: async function(obj) {
-		const resource = obj[this.resourceSymbol];
-		this.cache.del(resource);
-		return await this.store.set(resource, obj);
-	},
-	// invalidate the cache
-	invalidate: async function() {
-		this.cache.flushAll();
-	},
-};
+resourceSymbol = Symbol("resource")
+function createResources(store) {
+	return {
+		store,
+		cache: new NodeCache({ useClones: false }),
+		// call with a resource string or an object with { resource, force = false, cache = true }
+		fetch: async function(options) {
+			if (typeof options === "string")
+				options = { resource: options };
+			let obj;
+			if (!(options.force ?? false))
+				obj = this.cache.get(options.resource);
+			if (obj == null) {
+				obj = await this.store.get(options.resource);
+				if (options.cache ?? true)
+					this.cache.set(options.resource, obj);
+			}
+			obj = Object.assign({}, obj);  // always return a copy of the object
+			obj[resourceSymbol] = options.resource;
+			return obj;
+		},
+		// update the resource object to the store
+		push: async function(obj) {
+			const resource = obj[resourceSymbol];
+			this.cache.del(resource);
+			return await this.store.set(resource, obj);
+		},
+		// invalidate the cache
+		invalidate: async function() {
+			this.cache.flushAll();
+		},
+	};
+}
+const resources = createResources(store);
 
 // creates a "transaction" that updates all changed values at the end
 function createTransaction(resources) {
