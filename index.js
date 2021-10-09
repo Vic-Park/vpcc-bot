@@ -542,6 +542,9 @@ client.on("interactionCreate", async interaction => {
 			}
 		}
 
+		// fallback when command aint implemented
+		await interaction.editReply("not implemented yet lol");
+
 	} catch (e) {
 		console.error(e);
 		try {
