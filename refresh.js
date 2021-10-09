@@ -2,173 +2,104 @@
 
 require("dotenv").config();
 
+const { SlashCommandBuilder } = require("@discordjs/builders");
 const { REST } = require("@discordjs/rest");
 const { Routes } = require("discord-api-types/v9");
 
 const commands = [
-	{
-		name: "ping",
-		description: "Replies with pong",
-	},
-	{
-		name: "admin",
-		description: "Bot owner only commands",
-		options: [
-			{
-				name: "get",
-				description: "Retrieves a resource's property",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "key",
-						description: "Resource and property to locate",
-						type: 3,  // STRING
-						required: true,
-					},
-				],
-			},
-			{
-				name: "set",
-				description: "Updates a resource's property",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "key",
-						description: "Resource and property to locate",
-						type: 3,  // STRING
-						required: true,
-					},
-					{
-						name: "value",
-						description: "New value",
-						type: 3,  // STRING
-						required: true,
-					},
-				],
-			},
-			{
-				name: "invalidate",
-				description: "Invalidates the cache",
-				type: 1,  // SUB_COMMAND
-			},
-		],
-	},
-	{
-		name: "profile",
-		description: "Shows a summary of your profile",
-		options: [
-			{
-				name: "type",
-				description: "The type of summary to show",
-				type: 3,  // STRING
-				required: false,
-				choices: [
-					{ name: "user", value: "user" },
-					{ name: "medals", value: "medals" },
-					{ name: "points", value: "points" },
-					{ name: "team", value: "team" },
-				],
-			},
-		],
-	},
-	{
-		name: "team",
-		description: "Manage teams",
-		options: [
-			{
-				name: "create",
-				description: "Creates and joins a new team",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "name",
-						description: "Name of team",
-						type: 3,  // STRING
-						required: true,
-					},
-				],
-			},
-			{
-				name: "join",
-				description: "Joins a team",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "name",
-						description: "Name of team",
-						type: 3,  // STRING
-						required: true,
-					},
-				],
-			},
-			{
-				name: "leave",
-				description: "Leaves your team and destroys it if empty",
-				type: 1,  // SUB_COMMAND
-			},
-			{
-				name: "rename",
-				description: "Renames your team",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "name",
-						description: "New name of team",
-						type: 3,  // STRING
-						required: true,
-					},
-				],
-			},
-		],
-	},
-	{
-		name: "leaderboard",
-		description: "Shows the leaderboard with the top teams",
-	},
-	{
-		name: "points",
-		description: "Manages points",
-		options: [
-			{
-				name: "give-team",
-				description: "Gives a team a specified number of points",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "name",
-						description: "Name of team",
-						type: 3,  // STRING
-						required: true,
-					},
-					{
-						name: "points",
-						description: "Amount of points to give",
-						type: 4,  // INTEGER
-						required: true,
-					},
-				],
-			},
-			{
-				name: "give-voice",
-				description: "Gives all teams with at least one member in a voice channel a specified number of points",
-				type: 1,  // SUB_COMMAND
-				options: [
-					{
-						name: "name",
-						description: "Voice channel to target",
-						type: 7,  // CHANNEL
-						required: true,
-					},
-					{
-						name: "points",
-						description: "Amount of points to give",
-						type: 4,  // INTEGER
-						required: true,
-					},
-				],
-			},
-		],
-	},
+	new SlashCommandBuilder()
+		.setName("ping")
+		.setDescription("Replies with pong"),
+	new SlashCommandBuilder()
+		.setName("admin")
+		.setDescription("Bot owner only commands")
+		.addSubcommand(subcommand => subcommand
+			.setName("get")
+			.setDescription("Retrieves a resource's property")
+			.addStringOption(option => option
+				.setName("key")
+				.setDescription("Resource and property to locate")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("set")
+			.setDescription("Updates a resource's property")
+			.addStringOption(option => option
+				.setName("key")
+				.setDescription("Resource and property to locate")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("value")
+				.setDescription("New value")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("invalidate")
+			.setDescription("Invalidates the cache")),
+	new SlashCommandBuilder()
+		.setName("profile")
+		.setDescription("Shows a summary of your profile")
+		.addStringOption(option => option
+			.setName("type")
+			.setDescription("The type of summary to show")
+			.setRequired(false)
+			.addChoice("user", "user")
+			.addChoice("medals", "medals")
+			.addChoice("points", "points")
+			.addChoice("team", "team")),
+	new SlashCommandBuilder()
+		.setName("team")
+		.setDescription("Manage teams")
+		.addSubcommand(subcommand => subcommand
+			.setName("create")
+			.setDescription("Creates and joins a new team")
+			.addStringOption(option => option
+				.setName("name")
+				.setDescription("Name of team")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("join")
+			.setDescription("Joins a team")
+			.addStringOption(option => option
+				.setName("name")
+				.setDescription("Name of team")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("leave")
+			.setDescription("Leaves your team and destroys it if empty"))
+		.addSubcommand(subcommand => subcommand
+			.setName("rename")
+			.setDescription("Renames your team")
+			.addStringOption(option => option
+				.setName("name")
+				.setDescription("Name of team")
+				.setRequired(true))),
+	new SlashCommandBuilder()
+		.setName("leaderboard")
+		.setDescription("Shows the leaderboard with the top teams"),
+	new SlashCommandBuilder()
+		.setName("points")
+		.setDescription("Manages points")
+		.addSubcommand(subcommand => subcommand
+			.setName("give-team")
+			.setDescription("Gives a team a specified number of points")
+			.addStringOption(option => option
+				.setName("name")
+				.setDescription("Name of team")
+				.setRequired(true))
+			.addIntegerOption(option => option
+				.setName("points")
+				.setDescription("Amount of points to give")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("give-voice")
+			.setDescription("Gives all teams with at least one member in a voice channel a specified number of points")
+			.addChannelOption(option => option
+				.setName("name")
+				.setDescription("Voice channel to target")
+				.setRequired(true))
+			.addIntegerOption(option => option
+				.setName("points")
+				.setDescription("Amount of points to give")
+				.setRequired(true))),
 ];
 
 const rest = new REST({ version: "9" }).setToken(process.env.BOT_TOKEN);
