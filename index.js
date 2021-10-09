@@ -97,7 +97,7 @@ const resources = createResources(store);
 // creates a "transaction" that updates all changed values at the end
 function createTransaction(resources) {
 	return {
-		resources: resources,
+		resources,
 		data: {},
 		// call with a resource string or an object with resources.fetch.options
 		fetch: async function(options) {
@@ -122,15 +122,28 @@ function clearObject(obj) {
 		delete obj[name];
 }
 
+// get users info
+async function fetchUsers(resources) {
+	const users = await resources.fetch(`/users`);
+	users.userIds ??= [];
+	return users;
+}
+
+// get teams info
+async function fetchTeams(resources) {
+	const teams = await resources.fetch(`/teams`);
+	teams.teamIds ??= [];
+	return teams;
+}
+
 // find user with matching requirements
 async function findUser(resources, requirements) {
 	users:
-	for (const userId of (await resources.fetch(`/users`)).userIds ?? []) {
-		let user = await resources.fetch(`/user/${userId}`);
+	for (const userId of (await fetchUsers(resources)).userIds) {
+		let user = await fetchUser(resources, userId);
 		for (const name in requirements)
 			if (requirements[name] !== user[name])
 				continue users;
-		user.id ??= userId;
 		return user;
 	}
 	return undefined;
@@ -139,12 +152,11 @@ async function findUser(resources, requirements) {
 // find team with matching requirements
 async function findTeam(resources, requirements) {
 	teams:
-	for (const teamId of (await resources.fetch(`/teams`)).teamIds ?? []) {
-		let team = await resources.fetch(`/team/${teamId}`);
+	for (const teamId of (await fetchTeams(resources)).teamIds) {
+		let team = await fetchTeam(resources, teamId);
 		for (const name in requirements)
 			if (requirements[name] !== team[name])
 				continue teams;
-		team.id ??= teamId;
 		return team;
 	}
 	return undefined;
@@ -165,7 +177,7 @@ async function fetchTeam(resources, teamId) {
 }
 
 async function createUser(_guild, transaction, { id, ...properties }) {
-	const users = await transaction.fetch(`/users`);
+	const users = await fetchUsers(transaction);
 	const user = await fetchUser(transaction, id);
 	// create user with properties
 	Object.assign(user, properties);
@@ -174,7 +186,7 @@ async function createUser(_guild, transaction, { id, ...properties }) {
 }
 
 async function createTeam(guild, transaction, { id, ...properties }) {
-	const teams = await transaction.fetch(`/teams`);
+	const teams = await fetchTeams(transaction);
 	const team = await fetchTeam(transaction, id);
 	// create team with properties
 	Object.assign(team, properties);
@@ -234,7 +246,7 @@ async function leaveTeam(guild, transaction, user) {
 }
 
 async function destroyTeam(guild, transaction, team) {
-	const teams = await transaction.fetch(`/teams`);
+	const teams = await fetchTeams(transaction);
 	// remove team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
