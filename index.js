@@ -194,6 +194,8 @@ async function createTeam(guild, transaction, { id, ...properties }) {
 	// create team role
 	const role = await guild.roles.create({ name: `Team ${team.name}` });
 	team.discordRoleId = role.id;
+	// get supervisor role
+	const supervisorRole = (await guild.roles.fetch()).find(role => role.name.toLowerCase() === "supervisor")
 	// create team text and voice channels
 	const channelOptions = {
 		parent: (await guild.channels.fetch()).find(channel => (
@@ -205,6 +207,13 @@ async function createTeam(guild, transaction, { id, ...properties }) {
 			{ id: role, allow: [ Permissions.FLAGS.VIEW_CHANNEL ] },
 		],
 	};
+	if (supervisorRole != null) {
+		channelOptions.permissionOverwrites.push(
+			{ id: supervisorRole, allow: [ Permissions.FLAGS.VIEW_CHANNEL ] },
+		);
+	} else {
+		console.log("sus no supervisor role");
+	}
 	const textChannel = await guild.channels.create(`Team ${team.name}`, channelOptions);
 	const voiceChannel = await guild.channels.create(`Team ${team.name}`, { type: "GUILD_VOICE", ...channelOptions });
 	team.discordTextChannelId = textChannel.id;
