@@ -401,15 +401,15 @@ const teamFunctions = {
 			content: `Awaiting confirmation from ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to create new team called ${teamName}`,
 			components: [
 				new MessageActionRow().addComponents(
-					new MessageButton
+					new MessageButton()
 						.setCustomId("accept")
 						.setLabel("Accept")
 						.setStyle("PRIMARY"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("decline")
 						.setLabel("Decline")
 						.setStyle("DANGER"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("cancel")
 						.setLabel("Cancel")
 						.setStyle("SECONDARY"),
@@ -449,11 +449,11 @@ const teamFunctions = {
 			})()}?`,
 			components: [
 				new MessageActionRow().addComponents(
-					new MessageButton
+					new MessageButton()
 						.setCustomId("yes")
 						.setLabel("Confirm")
 						.setStyle("PRIMARY"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("no")
 						.setLabel("Cancel")
 						.setStyle("DANGER"),
@@ -498,15 +498,15 @@ const teamFunctions = {
 			content: `Awaiting approval from team ${teamName} with members ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to approve ${caller} joining`,
 			components: [
 				new MessageActionRow().addComponents(
-					new MessageButton
+					new MessageButton()
 						.setCustomId("approve")
 						.setLabel("Approve")
 						.setStyle("PRIMARY"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("reject")
 						.setLabel("Reject")
 						.setStyle("DANGER"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("cancel")
 						.setLabel("Cancel")
 						.setStyle("SECONDARY"),
@@ -561,15 +561,15 @@ const teamFunctions = {
 			content: `Awaiting approval from team members ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to approve renaming team to ${newTeamName}`,
 			components: [
 				new MessageActionRow().addComponents(
-					new MessageButton
+					new MessageButton()
 						.setCustomId("approve")
 						.setLabel("Approve")
 						.setStyle("PRIMARY"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("reject")
 						.setLabel("Reject")
 						.setStyle("DANGER"),
-					new MessageButton
+					new MessageButton()
 						.setCustomId("cancel")
 						.setLabel("Cancel")
 						.setStyle("SECONDARY"),
@@ -666,7 +666,7 @@ const teamFunctions = {
 			content: `${caller} is looking for a team! DM them if you want to team up!`,
 			components: [
 				new MessageActionRow().addComponents(
-					new MessageButton
+					new MessageButton()
 						.setCustomId("cancel")
 						.setLabel("Cancel")
 						.setStyle("SECONDARY"),
@@ -1121,11 +1121,11 @@ client.on("interactionCreate", async interaction => {
 					})()}?`,
 					components: [
 						new MessageActionRow().addComponents(
-							new MessageButton
+							new MessageButton()
 								.setCustomId("yes")
 								.setLabel("Confirm")
 								.setStyle("PRIMARY"),
-							new MessageButton
+							new MessageButton()
 								.setCustomId("no")
 								.setLabel("Cancel")
 								.setStyle("DANGER"),
