@@ -2,7 +2,6 @@
 
 require("dotenv").config();
 
-const fs = require("fs");
 const NodeCache = require("node-cache");
 const Keyv = require("keyv");
 const { KeyvFile } = require("keyv-file");
