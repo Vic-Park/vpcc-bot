@@ -12,6 +12,10 @@ client.on("ready", () => {
 	console.log(`Logged in as ${client.user.tag}`);
 });
 
+function sleep(milliseconds) {
+	return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
 function createStore(keyv) {
 	return {
