@@ -1060,6 +1060,111 @@ client.on("interactionCreate", async interaction => {
 				await interaction.editReply("*invalidated*");
 				return;
 			}
+			if (subcommandName === "remove-from-team") {
+				const teamName = interaction.options.getString("team-name", true);
+				const member = interaction.options.getMember("member", true);
+				console.log([ "admin", "remove-from-team", teamName, member, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if user doesnt exist
+				const user = await findUser(transaction, { discordUserId: member.id });
+				if (user == null) {
+					await interaction.editReply(`User is not in a team`);
+					return;
+				}
+				// fail if doesnt have a previous team
+				if (user.teamId == null) {
+					await interaction.editReply(`User is not in a team`);
+					return;
+				}
+				// get team name
+				const team = await fetchTeam(transaction, user.teamId);
+				const teamName = team.name;
+				// leave previous team
+				await leaveTeam(interaction.guild, transaction, user);
+				// remove team if empty
+				// if ((team.memberIds ?? []).length === 0) {
+				// 	await destroyTeam(interaction.guild, transaction, team);
+				// }
+				// reply to interaction
+				await transaction.commit();
+				await interaction.editReply(`Removed ${member} from team ${teamName}`);
+				return;
+			}
+			if (subcommandName === "delete-team") {
+				const teamName = interaction.options.getString("team-name", true);
+				console.log([ "admin", "delete-team", teamName, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if team doesnt exist
+				const team = await findTeam(transaction, { name: teamName });
+				const teamName = team.name;
+				if (team == null) {
+					await interaction.editReply(`Team does not exist`);
+					return;
+				}
+				// confirmation with a list of ppl in the team
+				await interaction.editReply({
+					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${await (async () => {
+						const names = [];
+						for (const memberId of team.memberIds) {
+							names.push((await interaction.guild.members.fetch((await fetchUser(memberId)).discordUserId)).nickname);
+						};
+						return names.join(", ");
+					})()}?`,
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton
+								.setCustomId("yes")
+								.setLabel("Confirm")
+								.setStyle("PRIMARY"),
+							new MessageButton
+								.setCustomId("no")
+								.setLabel("Cancel")
+								.setStyle("DANGER"),
+						),
+					],
+				});
+				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
+				const nextInteraction = (await interaction.fetchReply()).awaitMessageComponent({
+					filter: interaction => interaction.user.id === caller.id,
+					time: 10_000,
+				})
+				if (nextInteraction == null) {
+					await interaction.editReply(`Confirmation timed out`);
+					return;
+				}
+				if (nextInteraction.customId === "no") {
+					await interaction.editReply(`Cancelled team destruction`);
+					return;
+				}
+				// destroy team
+				for (const memberId of team.memberIds) {
+					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, memberId));
+				}
+				await destroyTeam(interaction.guild, transaction, team);
+				// reply to interaction
+				await transaction.commit();
+				await interaction.editReply(`Destroyed team ${teamName}`);
+				return;
+			}
+			if (subcommandName === "rename-team") {
+				const teamName = interaction.options.getString("team-name", true);
+				const newTeamName = interaction.options.getString("new-team-name", true);
+				console.log([ "admin", "rename-team", teamName, newTeamName, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if team doesnt exist
+				const team = await findTeam(transaction, { name: teamName });
+				const teamName = team.name;
+				if (team == null) {
+					await interaction.editReply(`Team does not exist`);
+					return;
+				}
+				// rename team
+				await renameTeam(interaction.guild, transaction, team, newTeamName);
+				// reply to interaction
+				await transaction.commit();
+				await interaction.editReply(`Renamed ${teamName} to ${newTeamName}`);
+				return;
+			}
 		}
 
 		if (interaction.commandName === "profile") {
