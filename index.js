@@ -346,7 +346,7 @@ const teamFunctions = {
 			return;
 		}
 		// create caller and team mates
-		for (const member of [caller, ...teamMate]) {
+		for (const member of [caller, ...teamMates]) {
 			if (await findUser(transaction, { discordUserId: member.id }) == null) {
 				await createUser(interaction.guild, transaction, { id: `${interaction.id}${member.id}`, discordUserId: member.id })
 			}
