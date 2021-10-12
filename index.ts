@@ -557,11 +557,11 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			nextInteraction = undefined;
 		}
 		if (nextInteraction == null) {
-			await interaction.editReply({ content: `Confirmation timed out`, components: [] });
+			await interaction.followUp({ content: `Confirmation timed out`, components: [] });
 			return;
 		}
 		if (nextInteraction.customId === "no") {
-			await interaction.editReply({ content: `Cancelled join request`, components: [] });
+			await interaction.followUp({ content: `Cancelled join request`, components: [] });
 			return;
 		}
 		// fail if team is full
@@ -570,8 +570,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			return;
 		}
 		// create delayed interaction info
-		await interaction.editReply(".");
-		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+		const message = await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).reply("...");
 		// const message = await interaction.followUp({ content: ".", fetchReply: true });
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
@@ -742,9 +741,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			clearObject(joinRandomInfo);
 			// complete command
 			await transaction.commit();
-			await interaction.editReply(".");
-			const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
-			await message.edit(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+			await interaction.editReply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
 			return;
 		}
 		// create delayed interaction info
@@ -1277,7 +1274,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					nextInteraction = undefined;
 				}
 				if (nextInteraction == null) {
-					await interaction.editReply({ content: `Confirmation timed out`, components: [] });
+					await interaction.followUp({ content: `Confirmation timed out`, components: [] });
 					return;
 				}
 				if (nextInteraction.customId === "no") {
