@@ -452,7 +452,7 @@ const teamFunctions = {
 			content: `Just to confirm, are you attempting to join team ${team.name} with members ${await (async () => {
 				const names = [];
 				for (const memberId of team.memberIds) {
-					names.push((await interaction.guild.members.fetch((await fetchUser(memberId)).discordUserId)).nickname);
+					names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).nickname);
 				};
 				return names.join(", ");
 			})()}?`,
@@ -587,7 +587,6 @@ const teamFunctions = {
 		});
 	},
 	async leave(interaction, metadata) {
-		const newTeamName = interaction.options.getString("new-team-name", true);
 		// log command and setup transaction
 		console.log([ "team2", "leave", metadata ]);
 		const transaction = createTransaction(resources);
@@ -736,7 +735,7 @@ client.on("interactionCreate", async interaction => {
 				await joinTeam(interaction.guild, transaction, team, callerUser);
 				if (team.accepted.length >= 1) {
 					for (const waiting of team.waiting) {
-						await joinTeam(interaction.guild, transaction, team, await fetchUser(waiting.id));
+						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, waiting.id));
 					}
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
@@ -749,7 +748,7 @@ client.on("interactionCreate", async interaction => {
 					await interaction.editReply(`Team ${team.name} with members ${await (async () => {
 						const names = [];
 						for (const memberId of team.memberIds) {
-							names.push((await interaction.guild.members.fetch((await fetchUser(memberId)).discordUserId)).toString());
+							names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).toString());
 						};
 						return names.join(", ");
 					})()} is created`);
@@ -777,7 +776,7 @@ client.on("interactionCreate", async interaction => {
 				team.declined.push(callerUser.id);
 				if (team.waiting.length == 0) {
 					for (const accepted of [team.caller, ...team.accepted]) {
-						await leaveTeam(interaction.guild, transaction, await fetchUser(accepted.id));
+						await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted.id));
 					}
 					await destroyTeam(interaction.guild, transaction, team);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -800,7 +799,7 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				for (const accepted of [team.caller, ...team.accepted]) {
-					await leaveTeam(interaction.guild, transaction, await fetchUser(accepted.id));
+					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted.id));
 				}
 				await destroyTeam(interaction.guild, transaction, team);
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -1036,8 +1035,7 @@ client.on("interactionCreate", async interaction => {
 		}
 
 		if (interaction.commandName === "admin") {
-			const user = interaction.user;
-			if (!user.roles.find(role => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
+			if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find(role => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
 				await interaction.editReply(`You are not an admin`);
 				return;
 			}
@@ -1148,7 +1146,7 @@ client.on("interactionCreate", async interaction => {
 					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${await (async () => {
 						const names = [];
 						for (const memberId of team.memberIds) {
-							names.push((await interaction.guild.members.fetch((await fetchUser(memberId)).discordUserId)).nickname);
+							names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).nickname);
 						};
 						return names.join(", ");
 					})()}?`,
