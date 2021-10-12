@@ -1039,6 +1039,12 @@ client.on("interactionCreate", async interaction => {
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
+				const owner = (await client.application.fetch()).owner;
+				const userId = interaction.user.id;
+				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
+					await interaction.editReply(`You are not the bot owner`);
+					return;
+				}
 				const key = interaction.options.getString("key", true);
 				console.log([ "admin", "get", key, metadata ]);
 				const [resource, ...properties] = key.split(".");
@@ -1059,6 +1065,12 @@ client.on("interactionCreate", async interaction => {
 				return;
 			}
 			if (subcommandName === "set") {
+				const owner = (await client.application.fetch()).owner;
+				const userId = interaction.user.id;
+				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
+					await interaction.editReply(`You are not the bot owner`);
+					return;
+				}
 				const key = interaction.options.getString("key", true);
 				const value = interaction.options.getString("value", true);
 				console.log([ "admin", "set", key, value, metadata ]);
