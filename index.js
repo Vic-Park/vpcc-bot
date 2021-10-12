@@ -470,10 +470,16 @@ const teamFunctions = {
 			],
 		});
 		// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-		const nextInteraction = (await interaction.fetchReply()).awaitMessageComponent({
-			filter: interaction => interaction.user.id === caller.id,
-			time: 10_000,
-		})
+		const nextInteraction = await (async () => {
+			try {
+				return await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
+					filter: interaction => interaction.user.id === caller.id,
+					time: 10_000,
+				});
+			} catch (e) {
+				return undefined;
+			}
+		})();
 		if (nextInteraction == null) {
 			await interaction.editReply(`Confirmation timed out`);
 			return;
@@ -1164,10 +1170,16 @@ client.on("interactionCreate", async interaction => {
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-				const nextInteraction = (await interaction.fetchReply()).awaitMessageComponent({
-					filter: interaction => interaction.user.id === caller.id,
-					time: 10_000,
-				})
+				const nextInteraction = await (async () => {
+					try {
+						return await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
+							filter: interaction => interaction.user.id === caller.id,
+							time: 10_000,
+						});
+					} catch (e) {
+						return undefined;
+					}
+				})();
 				if (nextInteraction == null) {
 					await interaction.editReply(`Confirmation timed out`);
 					return;
