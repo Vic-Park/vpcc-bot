@@ -413,7 +413,7 @@ const teamFunctions = {
 					new MessageButton()
 						.setCustomId("accept")
 						.setLabel("Accept")
-						.setStyle("PRIMARY"),
+						.setStyle("SUCCESS"),
 					new MessageButton()
 						.setCustomId("decline")
 						.setLabel("Decline")
@@ -461,7 +461,7 @@ const teamFunctions = {
 					new MessageButton()
 						.setCustomId("yes")
 						.setLabel("Confirm")
-						.setStyle("PRIMARY"),
+						.setStyle("SUCCESS"),
 					new MessageButton()
 						.setCustomId("no")
 						.setLabel("Cancel")
@@ -516,7 +516,7 @@ const teamFunctions = {
 					new MessageButton()
 						.setCustomId("approve")
 						.setLabel("Approve")
-						.setStyle("PRIMARY"),
+						.setStyle("SUCCESS"),
 					new MessageButton()
 						.setCustomId("reject")
 						.setLabel("Reject")
@@ -579,7 +579,7 @@ const teamFunctions = {
 					new MessageButton()
 						.setCustomId("approve")
 						.setLabel("Approve")
-						.setStyle("PRIMARY"),
+						.setStyle("SUCCESS"),
 					new MessageButton()
 						.setCustomId("reject")
 						.setLabel("Reject")
@@ -1161,7 +1161,7 @@ client.on("interactionCreate", async interaction => {
 							new MessageButton()
 								.setCustomId("yes")
 								.setLabel("Confirm")
-								.setStyle("PRIMARY"),
+								.setStyle("SUCCESS"),
 							new MessageButton()
 								.setCustomId("no")
 								.setLabel("Cancel")
