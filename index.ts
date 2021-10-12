@@ -1399,7 +1399,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.editReply(`Moved people who have a team into their voice channel`);
 				await workshopsChannel.send({
-					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button before to get the workshop role.`,
+					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button before to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
