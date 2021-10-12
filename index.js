@@ -331,7 +331,7 @@ const teamFunctions = {
 		if (member3 != null)
 			teamMates.push(member3);
 		// log command and setup transaction
-		console.log([ "team2", "create", teamName, members, metadata ]);
+		console.log([ "team2", "create", teamName, teamMates, metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// fail if another team with same name exists
@@ -350,7 +350,7 @@ const teamFunctions = {
 			return;
 		}
 		// fail if team mates aren't unique
-		if ((new Set(teamMates.map(member => member.id))).size !== teamMates.size) {
+		if ((new Set(teamMates.map(member => member.id))).size !== teamMates.length) {
 			await interaction.editReply(`A team mate was repeated in the command`);
 			return;
 		}
