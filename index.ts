@@ -725,6 +725,11 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		const joinRandomInfo = await transaction.fetch(`/joinRandom`);
 		// if there's another person tryna join a team
 		if ("start" in joinRandomInfo) {
+			// fail if its the same dude lol
+			if (joinRandomInfo.caller === callerUser.id) {
+				await interaction.editReply(`You are already waiting to join a random team`);
+				return;
+			}
 			// generate a random team name that doesn't exist
 			const teamName = `${Math.floor(Math.random() * 2000)}`
 			if (await findTeam(transaction, { name: teamName }) != null)
