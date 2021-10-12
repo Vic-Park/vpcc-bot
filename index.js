@@ -5,7 +5,7 @@ require("dotenv").config();
 const NodeCache = require("node-cache");
 const Keyv = require("keyv");
 const { KeyvFile } = require("keyv-file");
-const { Client, Intents, CategoryChannel, Permissions, User, MessageActionRow, MessageButton } = require("discord.js");
+const { Client, Intents, CategoryChannel, Permissions, User, MessageActionRow, MessageButton, TextChannel } = require("discord.js");
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS ], rejectOnRateLimit: () => true });
 
 client.on("ready", () => {
@@ -986,6 +986,23 @@ client.on("interactionCreate", async interaction => {
 				return;
 			}
 		}
+		if (info.type === "workshopRole") {
+			const workshop = await transaction.fetch(`/workshop/${info.workshopId}`);
+			if (interaction.customId === "add") {
+				await interaction.user.roles.add(workshop.discordRoleId);
+				// complete command
+				await transaction.commit();
+				await interaction.deleteReply();
+				return;
+			}
+			if (interaction.customId === "remove") {
+				await interaction.user.roles.remove(workshop.discordRoleId);
+				// complete command
+				await transaction.commit();
+				await interaction.deleteReply();
+				return;
+			}
+		}
 	} catch (e) {
 		console.error(e);
 		try {
@@ -1174,6 +1191,112 @@ client.on("interactionCreate", async interaction => {
 				// reply to interaction
 				await transaction.commit();
 				await interaction.editReply(`Renamed ${teamName} to ${newTeamName}`);
+				return;
+			}
+			if (subcommandName === "move-to-breakout-rooms") {
+				const workshopCode = interaction.options.getString("workshop-code", true);
+				console.log([ "admin", "move-to-breakout-rooms", workshopCode, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if workshop doesn't exist
+				const workshops = await transaction.fetch(`/workshops`)
+				const workshop = await (async () => {
+					for (const workshopId in workshops.workshopIds ??= []) {
+						const workshop = await transaction.fetch(`/workshop/${workshopId}`);
+						if (workshop.code == workshopCode) {
+							return workshop;
+						}
+					}
+				})();
+				if (workshop == null) {
+					await interaction.editReply(`Workshop does not exist`);
+					return;
+				}
+				// move everyone in a workshop to their respective teams if they have one
+				const channel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
+				for (const [memberId, member] of channel.members) {
+					let user = await findUser(transaction, { discordUserId: memberId });
+					if (user == null) continue;
+					if (user.teamId == null) continue;
+					const team = await fetchTeam(transaction, user.teamId);
+					const teamVoiceChannel = await interaction.guild.channels.fetch(team.discordVoiceChannelId);
+					await member.edit({ channel: teamVoiceChannel });
+					await sleep(250);  // hopefully this is enough lol
+				}
+				// reply to interaction
+				await transaction.commit();
+				await interaction.editReply(`Moved people who have a team into their voice channel`);
+				return;
+			}
+			if (subcommandName === "register-workshop") {
+				const workshopCode = interaction.options.getString("workshop-code", true);
+				const workshopName = interaction.options.getString("workshop-name", true);
+				console.log([ "admin", "register-workshop", workshopCode, workshopName, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if workshop with code exists
+				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
+				if (workshop.id != null) {
+					await interaction.editReply(`Workshop with same code exists`);
+					return;
+				}
+				// fail if no workshops category exists
+				const workshopsCategory = (await interaction.guild.channels.fetch()).find(channel => (
+					channel instanceof CategoryChannel
+					&& channel.name.toLowerCase() === "workshops"
+				));
+				if (workshopsCategory == null) {
+					await interaction.editReply(`No workshops category exists`);
+					return;
+				}
+				// fail if no workshops channel exists
+				const workshopsChannel = (await interaction.guild.channels.fetch()).children.find(channel => (
+					channel instanceof TextChannel
+					&& channel.name.toLowerCase() === "workshops"
+				));
+				if (workshopsChannel == null) {
+					await interaction.editReply(`No workshops channel exists`);
+					return;
+				}
+				// create workshop
+				((await transaction.fetch(`/workshop/${workshopCode}`)).ids ??= []).push(workshopCode);
+				workshop.id = workshopCode;
+				workshop.name = workshopName;
+				workshop.hostDiscordId = interaction.user.id;
+				// create delayed interaction info
+				const message = await interaction.fetchReply();
+				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
+				const info = await transaction.fetch(`/interaction/${message.id}`);
+				Object.assign(info, {
+					id: message.id,
+					type: "workshopRole",
+					workshopId: workshop.id,
+				});
+				// create workshop role
+				const role = await guild.roles.create({ name: `${workshopName}` });
+				team.discordRoleId = role.id;
+				// create workshop channels
+				const channelOptions = { parent: workshopsCategory };
+				const textChannel = await interaction.guild.channels.create(`${workshopName}`, { ...channelOptions });
+				const voiceChannel = await interaction.guild.channels.create(`${workshopName}`, { type: "GUILD_VOICE", ...channelOptions });
+				workshop.discordTextChannelId = textChannel.id;
+				workshop.discordVoiceChannelId = voiceChannel.id;
+				// reply to interaction
+				await transaction.commit();
+				await interaction.editReply(`Moved people who have a team into their voice channel`);
+				await workshopsChannel.send({
+					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button before to get the workshop role.`,
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId("add")
+								.setLabel(`Add ${workshopCode} role`)
+								.setStyle("SUCCESS"),
+							new MessageButton()
+								.setCustomId("remove")
+								.setLabel(`Remove ${workshopCode} role`)
+								.setStyle("DANGER"),
+						),
+					]
+				})
 				return;
 			}
 		}
