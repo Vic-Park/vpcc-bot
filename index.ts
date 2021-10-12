@@ -4,7 +4,7 @@ import NodeCache from "node-cache";
 import Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import { CategoryChannel, Client, CommandInteraction, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, Permissions, Role, TextChannel, User, VoiceChannel } from "discord.js";
-import assert from "assert";
+import _assert from "assert";
 
 require("dotenv").config();
 
@@ -16,6 +16,10 @@ client.on("ready", () => {
 
 function sleep(milliseconds: number) {
 	return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function assert<T>(thing: T): asserts thing is NonNullable<T> {
+	_assert(thing != null);
 }
 
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
@@ -297,6 +301,8 @@ async function renameTeam(guild: Guild, _transaction: Fetchable, team: TeamData,
 	// rename team
 	team.name = name;
 	// rename team channels
+	assert(team.discordTextChannelId);
+	assert(team.discordVoiceChannelId);
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
 	assert(textChannel);
@@ -304,17 +310,19 @@ async function renameTeam(guild: Guild, _transaction: Fetchable, team: TeamData,
 	await textChannel.edit({ name: `Team ${name}` });
 	await voiceChannel.edit({ name: `Team ${name}` });
 	// rename role
+	assert(team.discordRoleId);
 	const role = await guild.roles.fetch(team.discordRoleId);
 	assert(role);
 	await role.edit({ name: `Team ${name}` });
 }
 
 async function leaveTeam(guild: Guild, transaction: Fetchable, user: UserData) {
-	if (user.teamId == null) return;
+	assert(user.teamId);
 	const team = await fetchTeam(transaction, user.teamId);
 	team.id ??= user.teamId;
 	// leave team role
 	const discordMember = await guild.members.fetch(user.discordUserId);
+	assert(team.discordRoleId);
 	const role = await guild.roles.fetch(team.discordRoleId);
 	assert(role);
 	await discordMember.roles.remove(role);
@@ -326,6 +334,8 @@ async function leaveTeam(guild: Guild, transaction: Fetchable, user: UserData) {
 async function destroyTeam(guild: Guild, transaction: Fetchable, team: TeamData) {
 	const teams = await fetchTeams(transaction);
 	// remove team channels
+	assert(team.discordTextChannelId);
+	assert(team.discordVoiceChannelId);
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
 	assert(textChannel);
@@ -333,6 +343,7 @@ async function destroyTeam(guild: Guild, transaction: Fetchable, team: TeamData)
 	await textChannel.delete();
 	await voiceChannel.delete();
 	// remove team role
+	assert(team.discordRoleId);
 	const role = await guild.roles.fetch(team.discordRoleId);
 	assert(role);
 	await role.delete();
@@ -347,7 +358,7 @@ async function checkJoinRandom() {
 	const transaction = createTransaction(resources);
 	// check if joinRandom info is past 30 minutes
 	const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-	if (joinRandomInfo.start == null || joinRandomInfo.start <= Date.now() + 30 * 60_000)
+	if (joinRandomInfo.start == null || joinRandomInfo.start + 0.5 * 60_000 > Date.now())
 		return;
 	console.log("attempting to add user");
 	// loop through all teams and get a free to join team with the smallest team size
@@ -385,20 +396,21 @@ async function checkJoinRandom() {
 	await sleep(5000);  // hopefully the bot has started by now
 	checkJoinRandom();
 })();
-setInterval(checkJoinRandom, 60_000);
+setInterval(checkJoinRandom, 10_000);
 
 const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<void>> = {
 	async create(interaction: CommandInteraction, metadata: any) {
 		assert(interaction.guild);
+		assert(interaction.channel);
 		const teamName = interaction.options.getString("team-name", true);
 		const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
-		const member2 = await interaction.guild.members.fetch(interaction.options.getUser("member2", true));
-		const member3 = await interaction.guild.members.fetch(interaction.options.getUser("member3", true));
+		const member2 = interaction.options.getUser("member2", false);
+		const member3 = interaction.options.getUser("member3", false);
 		const teamMates = [member1];
 		if (member2 != null)
-			teamMates.push(member2);
+			teamMates.push(await interaction.guild.members.fetch(member2));
 		if (member3 != null)
-			teamMates.push(member3);
+			teamMates.push(await interaction.guild.members.fetch(member3));
 		// log command and setup transaction
 		console.log([ "team2", "create", teamName, teamMates, metadata ]);
 		const transaction = createTransaction(resources);
@@ -442,7 +454,10 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			}
 		}
 		// create delayed interaction info
-		const message = await interaction.fetchReply();
+		await interaction.editReply(".");
+		const previousMessage = await interaction.fetchReply();
+		const message = await (await interaction.channel.messages.fetch(previousMessage.id)).reply(".");
+		// const message = await interaction.fetchReply();
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -464,7 +479,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// complete command and commit transaction
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
-		await interaction.editReply({
+		await message.edit({
 			content: `Awaiting confirmation from ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to create new team called ${teamName}`,
 			components: [
 				new MessageActionRow().addComponents(
@@ -551,7 +566,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			return;
 		}
 		// create delayed interaction info
-		const message = await interaction.followUp({ content: ".", fetchReply: true });
+		await interaction.editReply(".");
+		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+		// const message = await interaction.followUp({ content: ".", fetchReply: true });
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -566,7 +583,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// complete command and commit transaction
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
-		await interaction.editReply({
+		await message.edit({
 			content: `Awaiting approval from team ${teamName} with members ${teamMates.map(member => member.toString()).join(", ")} to approve ${caller} joining`,
 			components: [
 				new MessageActionRow().addComponents(
@@ -588,6 +605,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 	},
 	async rename(interaction: CommandInteraction, metadata: any) {
 		assert(interaction.guild);
+		assert(interaction.channel);
 		const newTeamName = interaction.options.getString("new-team-name", true);
 		// log command and setup transaction
 		console.log([ "team2", "rename", newTeamName, metadata ]);
@@ -619,7 +637,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
 		};
 		// create delayed interaction info
-		const message = await interaction.fetchReply();
+		await interaction.editReply(".");
+		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+		// const message = await interaction.fetchReply();
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -635,7 +655,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// complete command and commit transaction
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
-		await interaction.editReply({
+		await message.edit({
 			content: `Awaiting approval from team members ${teamMates.filter(member => member.id !== caller.id).map(member => member.toString()).join(", ")} to approve renaming team to ${newTeamName}`,
 			components: [
 				new MessageActionRow().addComponents(
@@ -718,7 +738,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			clearObject(joinRandomInfo);
 			// complete command
 			await transaction.commit();
-			await interaction.editReply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+			await interaction.editReply(".");
+			const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+			await message.edit(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
 			return;
 		}
 		// create delayed interaction info
@@ -855,10 +877,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				removeFromArray(info.waiting, callerUser.id);
 				info.declined.push(callerUser.id);
 				if (info.waiting.length == 0) {
+					const teamName = info.futureTeamName;
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`Team ${info.futureTeamName} will not be created`);
+					await message.reply(`Team ${teamName} will not be created`);
 					return;
 				}
 				await transaction.commit();
@@ -870,10 +893,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					await message.reply(`Caller isn't inviter`);
 					return;
 				}
+				const teamName = info.futureTeamName;
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await message.reply(`Team ${info.futureTeamName} cancelled`);
+				await message.reply(`Team ${teamName} cancelled`);
 				return;
 			}
 		}
@@ -898,22 +922,23 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
+				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
 				if (info.approved.length > numMembers / 2) {
 					// fail if team is full
 					if (info.memberIds.length >= 4) {
 						await transaction.commit();
-						await message.reply(`${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s requested team is now full`);
+						await message.reply(`${callerDiscordUser}'s requested team is now full`);
 						return;
 					}
 					await joinTeam(interaction.guild, transaction, team, callerUser);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)} joined team ${team.name}`);
+					await message.reply(`${callerDiscordUser} joined team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Approved request from ${(await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)).user.username} to ${team.name}`);
+				await message.reply(`Approved request from ${callerDiscordUser.user.username} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -929,15 +954,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
+				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
 				if (info.rejected.length > numMembers / 2) {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`Rejected ${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s request to join team ${team.name}`);
+					await message.reply(`Rejected ${callerDiscordUser}'s request to join team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Rejected request from ${(await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)).user.username} to ${team.name}`);
+				await message.reply(`Rejected request from ${callerDiscordUser.user.username} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -1012,10 +1038,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
 				if (info.rejected.length > numMembers / 2) {
+					const teamName = info.newTeamName;
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`Request to rename team ${team.name} to ${info.newTeamName} is rejected`);
+					await message.reply(`Request to rename team ${team.name} to ${teamName} is rejected`);
 					return;
 				}
 				await transaction.commit();
@@ -1027,10 +1054,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					await message.reply(`Caller isn't rename requester`);
 					return;
 				}
+				const teamName = info.newTeamName;
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await message.reply(`Request to rename team ${team.name} to ${info.newTeamName} is cancelled`);
+				await message.reply(`Request to rename team ${team.name} to ${teamName} is cancelled`);
 				return;
 			}
 		}
@@ -1053,7 +1081,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await message.reply(`Cancelled join random request`);
+				await message.channel.send(`Cancelled join random request`);
 				return;
 			}
 		}
@@ -1253,7 +1281,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					return;
 				}
 				// destroy team
-				for (const memberId of team.memberIds) {
+				for (const memberId of [...team.memberIds]) {
 					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, memberId));
 				}
 				await destroyTeam(interaction.guild, transaction, team);
@@ -1287,7 +1315,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if workshop doesn't exist
 				const workshops = await transaction.fetch(`/workshops`)
 				const workshop = await (async () => {
-					for (const workshopId in workshops.workshopIds ??= []) {
+					for (const workshopId in workshops.ids ??= []) {
 						const workshop = await transaction.fetch(`/workshop/${workshopId}`);
 						if (workshop.code == workshopCode) {
 							return workshop;
@@ -1348,7 +1376,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				((await transaction.fetch(`/workshop/${workshopCode}`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
 				workshop.name = workshopName;
-				workshop.hostDiscordId = interaction.user.id;
+				workshop.hostDiscordUserId = interaction.user.id;
 				// create delayed interaction info
 				const message = await interaction.fetchReply();
 				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
