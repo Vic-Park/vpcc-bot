@@ -273,13 +273,13 @@ async function destroyTeam(guild, transaction, team) {
 	clearObject(team);
 }
 
-setInterval(async () => {
+async function checkJoinRandom() {
 	const guild = await client.guilds.fetch(process.env.GUILD_ID);
 	console.log("running check on joinRandom")
 	const transaction = createTransaction(resources);
 	// check if joinRandom info is past 30 minutes
 	const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-	if (joinRandomInfo.start <= Date.now() + 30 * 60_000)
+	if (joinRandomInfo.start == null || joinRandomInfo.start <= Date.now() + 30 * 60_000)
 		return;
 	console.log("attempting to add user")
 	// loop through all teams and get a free to join team with the smallest team size
@@ -292,7 +292,7 @@ setInterval(async () => {
 			bestTeam = team;
 		}
 	}
-	const caller = await fetchUser(joinRandomInfo.caller);
+	const caller = await fetchUser(transaction, joinRandomInfo.caller);
 	// if there's no team available, dm the user with sad face
 	if (bestTeam == null) {
 		(await (await guild.channels.fetch(joinRandomInfo.discordChannelId)).messages.fetch(joinRandomInfo.discordMessageId)).delete();
@@ -312,7 +312,12 @@ setInterval(async () => {
 	clearObject(joinRandomInfo);
 	await transaction.commit();
 	await channel.send(`${await guild.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
-}, 60_000)
+}
+(async () => {
+	await sleep(5000);  // hopefully the bot has started by now
+	checkJoinRandom();
+})();
+setInterval(checkJoinRandom, 60_000);
 
 const teamFunctions = {
 	async create(interaction, metadata) {
