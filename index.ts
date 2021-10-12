@@ -1313,16 +1313,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "move-to-breakout-rooms", workshopCode, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if workshop doesn't exist
-				const workshops = await transaction.fetch(`/workshops`)
-				const workshop = await (async () => {
-					for (const workshopId in workshops.ids ??= []) {
-						const workshop = await transaction.fetch(`/workshop/${workshopId}`);
-						if (workshop.code == workshopCode) {
-							return workshop;
-						}
-					}
-				})();
-				if (workshop == null) {
+				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
+				if (workshop.id == null) {
 					await interaction.editReply(`Workshop does not exist`);
 					return;
 				}
@@ -1373,12 +1365,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					return;
 				}
 				// create workshop
-				((await transaction.fetch(`/workshop/${workshopCode}`)).ids ??= []).push(workshopCode);
+				((await transaction.fetch(`/workshops`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
 				workshop.name = workshopName;
 				workshop.hostDiscordUserId = interaction.user.id;
 				// create delayed interaction info
-				const message = await interaction.fetchReply();
+				const message = await workshopsChannel.send(".");
 				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 				const info = await transaction.fetch(`/interaction/${message.id}`);
 				Object.assign(info, {
@@ -1397,8 +1389,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				workshop.discordVoiceChannelId = voiceChannel.id;
 				// reply to interaction
 				await transaction.commit();
-				await interaction.editReply(`Moved people who have a team into their voice channel`);
-				await workshopsChannel.send({
+				await interaction.editReply(`Created workshop`);
+				await message.edit({
 					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button before to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
 					components: [
 						new MessageActionRow().addComponents(
@@ -1412,7 +1404,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 								.setStyle("DANGER"),
 						),
 					]
-				})
+				});
 				return;
 			}
 			if (subcommandName === "list-all-teams") {
