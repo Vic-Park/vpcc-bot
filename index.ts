@@ -1,49 +1,55 @@
 // Runs the VPCC-Bot
 
+import NodeCache from "node-cache";
+import Keyv from "keyv";
+import { KeyvFile } from "keyv-file";
+import { CategoryChannel, Client, CommandInteraction, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, Permissions, Role, TextChannel, User, VoiceChannel } from "discord.js";
+import assert from "assert";
+
 require("dotenv").config();
 
-const NodeCache = require("node-cache");
-const Keyv = require("keyv");
-const { KeyvFile } = require("keyv-file");
-const { Client, Intents, CategoryChannel, Permissions, User, MessageActionRow, MessageButton, TextChannel } = require("discord.js");
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS ], rejectOnRateLimit: () => true });
 
 client.on("ready", () => {
-	console.log(`Logged in as ${client.user.tag}`);
+	console.log(`Logged in as ${client.user!.tag}`);
 });
 
-function sleep(milliseconds) {
+function sleep(milliseconds: number) {
 	return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
-function createStore(keyv) {
-	return {
-		keyv,
-		async get(resource) {
-			return (await this.keyv.get(resource)) ?? {};
-		},
-		async set(resource, data) {
-			if (JSON.stringify(data) === "{}")
-				return await this.keyv.delete(resource);
-			else
-				return await this.keyv.set(resource, data);
-		},
-		async modify(resource, callback) {
-			const data = await get(this.keyv, resource);
-			await callback(data);
-			await set(this.keyv, resource, data);
-		},
+class Store {
+	keyv: Keyv<Object>;
+	constructor(keyv: Keyv<Object>) {
+		this.keyv = keyv;
 	};
+	async get(resource: string): Promise<Object> {
+		return (await this.keyv.get(resource)) ?? {};
+	};
+	async set(resource: string, data: Object): Promise<void> {
+		if (JSON.stringify(data) === "{}")
+			await this.keyv.delete(resource);
+		else
+			await this.keyv.set(resource, data);
+	};
+	async modify(resource: string, callback: (data: Object) => any): Promise<void> {
+		const data = await this.get(resource);
+		await callback(data);
+		await this.set(resource, data);
+	};
+}
+function createStore(keyv: Keyv<Object>): Store {
+	return new Store(keyv);
 }
 const store = createStore(new Keyv({
 	store: new KeyvFile({
 		filename: "store.json",
 	}),
-}));
+}) as Keyv<Object>);
 
 // Helper function to remove an element from an array
-function removeFromArray(array, element) {
+function removeFromArray<T>(array: T[], element: T): typeof array {
 	const index = array.lastIndexOf(element);
 	if (index !== -1)
 		array.splice(index, 1);
@@ -51,7 +57,7 @@ function removeFromArray(array, element) {
 }
 
 // Asynchronous version of Array.prototype.find
-async function findPredicate(array, predicate) {
+async function findPredicate<T>(array: T[], predicate: (v: T, i: number, a: typeof array) => Promise<boolean>): Promise<T | undefined> {
 	for (let i = 0; i < array.length; i++) {
 		if (await predicate(array[i], i, array)) {
 			return array[i];
@@ -63,89 +69,135 @@ async function findPredicate(array, predicate) {
 // - VPCC specific helper functions
 
 // global cache object
-resourceSymbol = Symbol("resource")
-function createResources(store) {
-	return {
-		store,
-		cache: new NodeCache({ useClones: false }),
-		// call with a resource string or an object with { resource, force = false, cache = true }
-		fetch: async function(options) {
-			if (typeof options === "string")
-				options = { resource: options };
-			let obj;
-			if (!(options.force ?? false))
-				obj = this.cache.get(options.resource);
-			if (obj == null) {
-				obj = await this.store.get(options.resource);
-				if (options.cache ?? true)
-					this.cache.set(options.resource, obj);
-			}
-			obj = Object.assign({}, obj);  // always return a copy of the object
-			obj[resourceSymbol] = options.resource;
-			return obj;
-		},
-		// update the resource object to the store
-		push: async function(obj) {
-			const resource = obj[resourceSymbol];
-			this.cache.del(resource);
-			return await this.store.set(resource, obj);
-		},
-		// invalidate the cache
-		invalidate: async function() {
-			this.cache.flushAll();
-		},
+type ResourceFetchOptions = string | { force?: boolean; resource: string; cache?: boolean };
+class Resources {
+	store: Store;
+	cache: NodeCache;
+	resourceCache: WeakMap<object, string>;
+	constructor(store: Store) {
+		this.store = store;
+		this.cache = new NodeCache();
+		this.resourceCache = new WeakMap();
 	};
+	// call with a resource string or an object with { resource, force = false, cache = true }
+	async fetch(options: ResourceFetchOptions): Promise<Record<string, any>> {
+		if (typeof options === "string")
+			options = { resource: options };
+		let obj: Record<string, any> | null | undefined = undefined;
+		if (!(options.force ?? false))
+			obj = this.cache.get(options.resource);
+		if (obj == null) {
+			obj = await this.store.get(options.resource);
+			if (options.cache ?? true)
+				this.cache.set(options.resource, obj);
+		}
+		this.resourceCache.set(obj, options.resource);
+		return obj;
+	};
+	// update the resource object to the store
+	async push(obj: Record<string, any>) {
+		const resource = this.resourceCache.get(obj);
+		if (resource == null) return;
+		this.cache.del(resource);
+		return await this.store.set(resource, obj);
+	};
+	// invalidate the cache
+	async invalidate() {
+		this.cache.flushAll();
+	};
+}
+function createResources(store: Store): Resources {
+	return new Resources(store);
 }
 const resources = createResources(store);
 
 // creates a "transaction" that updates all changed values at the end
-function createTransaction(resources) {
-	return {
-		resources,
-		data: {},
-		// call with a resource string or an object with resources.fetch.options
-		fetch: async function(options) {
-			if (typeof options === "string")
-				options = { resource: options };
-			return this.data[options.resource] ??= await this.resources.fetch(options);
-		},
-		// pushes all changes and clears data
-		commit: async function() {
-			for (const resource in this.data) {
-				// future: check if something actually changed before pushing
-				await this.resources.push(this.data[resource]);
-				delete this.data[resource];
-			}
-		},
+class Transaction {
+	resources: Resources;
+	data: Record<string, any>;
+	constructor(resources: Resources) {
+		this.resources = resources;
+		this.data = {};
+	};
+	// call with a resource string or an object with resources.fetch.options
+	async fetch(options: ResourceFetchOptions): Promise<Record<string, any>> {
+		if (typeof options === "string")
+			options = { resource: options };
+		return this.data[options.resource] ??= await this.resources.fetch(options);
+	};
+	// pushes all changes and clears data
+	async commit(): Promise<void> {
+		for (const resource in this.data) {
+			// future: check if something actually changed before pushing
+			await this.resources.push(this.data[resource]);
+			delete this.data[resource];
+		}
 	};
 }
+function createTransaction(resources: Resources) {
+	return new Transaction(resources);
+}
+
+// fetchable type
+type Fetchable = Transaction | Resources;
 
 // deletes all values from an object
-function clearObject(obj) {
+function clearObject(obj: Record<string, any>) {
 	for (const name in obj)
 		delete obj[name];
 }
 
+type TeamsData = {
+	teamIds: TeamData["id"][],
+}
+
+type UsersData = {
+	userIds: UserData["id"][],
+}
+
+type TeamData = {
+	id: string,
+	name: string,
+	memberIds: string[],
+	discordRoleId: string,
+	discordTextChannelId: string,
+	discordVoiceChannelId: string,
+	freeToJoin?: boolean,
+}
+
+type UserData = {
+	id: string,
+	teamId?: string,
+	discordUserId: string,
+}
+
 // get users info
-async function fetchUsers(resources) {
+async function fetchUsers(resources: Fetchable): Promise<UsersData> {
 	const users = await resources.fetch(`/users`);
 	users.userIds ??= [];
-	return users;
+	return users as UsersData;
 }
 
 // get teams info
-async function fetchTeams(resources) {
+async function fetchTeams(resources: Fetchable): Promise<TeamsData> {
 	const teams = await resources.fetch(`/teams`);
 	teams.teamIds ??= [];
-	return teams;
+	return teams as TeamsData;
+}
+
+// Typed Object.keys
+function* objectKeys<T>(thing: T): Generator<keyof T> {
+	for (const name in thing) {
+		yield name as keyof T;
+	}
 }
 
 // find user with matching requirements
-async function findUser(resources, requirements) {
+async function findUser(resources: Fetchable, requirements: Partial<UserData>) {
 	users:
 	for (const userId of (await fetchUsers(resources)).userIds) {
 		let user = await fetchUser(resources, userId);
-		for (const name in requirements)
+		for (const name of objectKeys(requirements))
 			if (requirements[name] !== user[name])
 				continue users;
 		return user;
@@ -154,11 +206,11 @@ async function findUser(resources, requirements) {
 }
 
 // find team with matching requirements
-async function findTeam(resources, requirements) {
+async function findTeam(resources: Fetchable, requirements: Partial<TeamData>) {
 	teams:
 	for (const teamId of (await fetchTeams(resources)).teamIds) {
 		let team = await fetchTeam(resources, teamId);
-		for (const name in requirements)
+		for (const name of objectKeys(requirements))
 			if (requirements[name] !== team[name])
 				continue teams;
 		return team;
@@ -167,20 +219,20 @@ async function findTeam(resources, requirements) {
 }
 
 // find user with id
-async function fetchUser(resources, userId) {
+async function fetchUser(resources: Fetchable, userId: string): Promise<UserData> {
 	const user = await resources.fetch(`/user/${userId}`);
 	user.id ??= userId;
-	return user;
+	return user as UserData;
 }
 
 // find teamId with id
-async function fetchTeam(resources, teamId) {
+async function fetchTeam(resources: Fetchable, teamId: string): Promise<TeamData> {
 	const team = await resources.fetch(`/team/${teamId}`);
 	team.id ??= teamId;
-	return team;
+	return team as TeamData;
 }
 
-async function createUser(_guild, transaction, { id, ...properties }) {
+async function createUser(_guild: any, transaction: Fetchable, { id, ...properties }: UserData): Promise<UserData> {
 	const users = await fetchUsers(transaction);
 	const user = await fetchUser(transaction, id);
 	// create user with properties
@@ -189,23 +241,28 @@ async function createUser(_guild, transaction, { id, ...properties }) {
 	return user;
 }
 
-async function createTeam(guild, transaction, { id, ...properties }) {
+async function createTeam(guild: Guild, transaction: Fetchable, { id, ...properties }: Omit<TeamData, "memberIds" | "discordRoleId" | "discordTextChannelId" | "discordVoiceChannelId">): Promise<TeamData> {
 	const teams = await fetchTeams(transaction);
 	const team = await fetchTeam(transaction, id);
 	// create team with properties
 	Object.assign(team, properties);
 	(teams.teamIds ??= []).push(team.id);
+	team.memberIds ??= [];
 	// create team role
 	const role = await guild.roles.create({ name: `Team ${team.name}` });
 	team.discordRoleId = role.id;
 	// get supervisor role
-	const supervisorRole = (await guild.roles.fetch()).find(role => role.name.toLowerCase() === "supervisor")
+	const supervisorRole = (await guild.roles.fetch()).find((role: { name: string; }) => role.name.toLowerCase() === "supervisor")
 	// create team text and voice channels
+	const teamCategory = (await guild.channels.fetch()).find((channel: GuildChannel) => (
+		channel instanceof CategoryChannel
+		&& channel.name.toLowerCase() === "team"
+	)) as CategoryChannel | undefined;
+	if (teamCategory == null) {
+		throw Error("team category not found");
+	}
 	const channelOptions = {
-		parent: (await guild.channels.fetch()).find(channel => (
-			channel instanceof CategoryChannel
-			&& channel.name.toLowerCase() === "team"
-		)),
+		parent: teamCategory,
 		permissionOverwrites: [
 			{ id: guild.roles.everyone, deny: [ Permissions.FLAGS.VIEW_CHANNEL ] },
 			{ id: role, allow: [ Permissions.FLAGS.VIEW_CHANNEL ] },
@@ -225,48 +282,59 @@ async function createTeam(guild, transaction, { id, ...properties }) {
 	return team;
 }
 
-async function joinTeam(guild, _transaction, team, user) {
+async function joinTeam(guild: Guild, _transaction: Fetchable, team: TeamData, user: UserData) {
 	// join team
 	(team.memberIds ??= []).push(user.id);
 	user.teamId = team.id;
 	// join team role
 	const discordMember = await guild.members.fetch(user.discordUserId);
-	await discordMember.roles.add(team.discordRoleId);
+	const role = await guild.roles.fetch(team.discordRoleId);
+	assert(role);
+	await discordMember.roles.add(role);
 }
 
-async function renameTeam(guild, _transaction, team, name) {
+async function renameTeam(guild: Guild, _transaction: Fetchable, team: TeamData, name: string) {
 	// rename team
 	team.name = name;
 	// rename team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
+	assert(textChannel);
+	assert(voiceChannel);
 	await textChannel.edit({ name: `Team ${name}` });
 	await voiceChannel.edit({ name: `Team ${name}` });
 	// rename role
 	const role = await guild.roles.fetch(team.discordRoleId);
+	assert(role);
 	await role.edit({ name: `Team ${name}` });
 }
 
-async function leaveTeam(guild, transaction, user) {
+async function leaveTeam(guild: Guild, transaction: Fetchable, user: UserData) {
+	if (user.teamId == null) return;
 	const team = await fetchTeam(transaction, user.teamId);
 	team.id ??= user.teamId;
 	// leave team role
 	const discordMember = await guild.members.fetch(user.discordUserId);
-	await discordMember.roles.remove(team.discordRoleId);
+	const role = await guild.roles.fetch(team.discordRoleId);
+	assert(role);
+	await discordMember.roles.remove(role);
 	// leave team
 	removeFromArray((team.memberIds ??= []), user.id);
 	user.teamId = undefined;
 }
 
-async function destroyTeam(guild, transaction, team) {
+async function destroyTeam(guild: Guild, transaction: Fetchable, team: TeamData) {
 	const teams = await fetchTeams(transaction);
 	// remove team channels
 	const textChannel = await guild.channels.fetch(team.discordTextChannelId);
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
+	assert(textChannel);
+	assert(voiceChannel);
 	await textChannel.delete();
 	await voiceChannel.delete();
 	// remove team role
 	const role = await guild.roles.fetch(team.discordRoleId);
+	assert(role);
 	await role.delete();
 	// remove team
 	removeFromArray((teams.teamIds ??= []), team.id);
@@ -274,14 +342,14 @@ async function destroyTeam(guild, transaction, team) {
 }
 
 async function checkJoinRandom() {
-	const guild = await client.guilds.fetch(process.env.GUILD_ID);
-	console.log("running check on joinRandom")
+	const guild = await client.guilds.fetch(process.env.GUILD_ID!);
+	console.log("running check on joinRandom");
 	const transaction = createTransaction(resources);
 	// check if joinRandom info is past 30 minutes
 	const joinRandomInfo = await transaction.fetch(`/joinRandom`);
 	if (joinRandomInfo.start == null || joinRandomInfo.start <= Date.now() + 30 * 60_000)
 		return;
-	console.log("attempting to add user")
+	console.log("attempting to add user");
 	// loop through all teams and get a free to join team with the smallest team size
 	let bestTeam = undefined;
 	for (const teamId of (await fetchTeams(transaction)).teamIds ?? []) {
@@ -295,7 +363,7 @@ async function checkJoinRandom() {
 	const caller = await fetchUser(transaction, joinRandomInfo.caller);
 	// if there's no team available, dm the user with sad face
 	if (bestTeam == null) {
-		(await (await guild.channels.fetch(joinRandomInfo.discordChannelId)).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+		(await (await guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
 		removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
 		clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
 		clearObject(joinRandomInfo);
@@ -305,13 +373,13 @@ async function checkJoinRandom() {
 	}
 	// join the team and clear info
 	await joinTeam(guild, transaction, bestTeam, caller);
-	const channel = await guild.channels.fetch(joinRandomInfo.discordChannelId);
+	const channel = await guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel;
 	(await channel.messages.fetch(joinRandomInfo.discordMessageId)).delete();
 	removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
 	clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
 	clearObject(joinRandomInfo);
 	await transaction.commit();
-	await channel.send(`${await guild.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
+	await channel.send(`${await guild.members.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
 }
 (async () => {
 	await sleep(5000);  // hopefully the bot has started by now
@@ -319,12 +387,13 @@ async function checkJoinRandom() {
 })();
 setInterval(checkJoinRandom, 60_000);
 
-const teamFunctions = {
-	async create(interaction, metadata) {
+const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<void>> = {
+	async create(interaction: CommandInteraction, metadata: any) {
+		assert(interaction.guild);
 		const teamName = interaction.options.getString("team-name", true);
-		const member1 = interaction.options.getMember("member1", true);
-		const member2 = interaction.options.getMember("member2");
-		const member3 = interaction.options.getMember("member3");
+		const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
+		const member2 = await interaction.guild.members.fetch(interaction.options.getUser("member2", true));
+		const member3 = await interaction.guild.members.fetch(interaction.options.getUser("member3", true));
 		const teamMates = [member1];
 		if (member2 != null)
 			teamMates.push(member2);
@@ -361,33 +430,17 @@ const teamFunctions = {
 			}
 		}
 		// fail if caller is already in a team
-		if ((await findUser(transaction, { discordUserId: caller.id })).teamId != null) {
+		if ((await findUser(transaction, { discordUserId: caller.id }))!.teamId != null) {
 			await interaction.editReply(`You are still in a team`);
 			return;
 		}
 		// fail if a team mate is already in a team
 		for (const teamMate of teamMates) {
-			if ((await findUser(transaction, { discordUserId: teamMate.id })).teamId != null) {
+			if ((await findUser(transaction, { discordUserId: teamMate.id }))!.teamId != null) {
 				await interaction.editReply(`A team mate is still in a team`);
 				return;
 			}
 		}
-		// create incomplete team
-		const team = await createTeam(interaction.guild, transaction, {
-			id: interaction.id,
-			name: teamName,
-			incomplete: true,
-			waiting: await (async () => {
-				const waiting = [];
-				for (const teamMate of teamMates) {
-					waiting.push((await findUser(transaction, { discordUserId: teamMate.id })).id);
-				}
-				return waiting;
-			})(),
-			accepted: [],
-			declined: [],
-			caller: (await findUser(transaction, { discordUserId: caller.id })).id,
-		});
 		// create delayed interaction info
 		const message = await interaction.fetchReply();
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
@@ -395,14 +448,19 @@ const teamFunctions = {
 		Object.assign(info, {
 			id: message.id,
 			type: "teamCreate",
-			teamId: team.id,
+			futureTeamId: interaction.id,
+			futureTeamName: teamName,
+			waiting: await (async () => {
+				const waiting = [];
+				for (const teamMate of teamMates) {
+					waiting.push((await findUser(transaction, { discordUserId: teamMate.id }))!.id);
+				}
+				return waiting;
+			})(),
+			accepted: [],
+			declined: [],
+			caller: (await findUser(transaction, { discordUserId: caller.id }))!.id,
 		});
-		// join team
-		await joinTeam(interaction.guild, transaction, team, await findUser(transaction, { discordUserId: caller.id }));
-		// for (const teamMate of teamMates) {
-		// 	await joinTeam(interaction.guild, transaction, team, await findUser(transaction, { discordUserId: teamMate.id }));
-		// }
-		// Created and joined new team called ${teamName}
 		// complete command and commit transaction
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
@@ -426,7 +484,9 @@ const teamFunctions = {
 			],
 		});
 	},
-	async join(interaction, metadata) {
+	async join(interaction: CommandInteraction, metadata: any) {
+		assert(interaction.guild);
+		assert(interaction.channel);
 		const teamName = interaction.options.getString("team-name", true);
 		// log command and setup transaction
 		console.log([ "team2", "join", teamName, metadata ]);
@@ -434,7 +494,7 @@ const teamFunctions = {
 		const caller = interaction.user;
 		// fail if team with name doesnt exists
 		const team = await findTeam(transaction, { name: teamName });
-		if (team == null || team.incomplete) {
+		if (team == null) {
 			await interaction.editReply(`Team called ${teamName} doesn't exists`);
 			return;
 		}
@@ -443,19 +503,17 @@ const teamFunctions = {
 			await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 		}
 		// fail if caller is already in a team
-		if ((await findUser(transaction, { discordUserId: caller.id })).teamId != null) {
+		if ((await findUser(transaction, { discordUserId: caller.id }))!.teamId != null) {
 			await interaction.editReply(`You are still in a team`);
 			return;
 		}
+		const teamMates = [];
+		for (const memberId of team.memberIds) {
+			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+		};
 		// confirm with caller
 		await interaction.editReply({
-			content: `Just to confirm, are you attempting to join team ${team.name} with members ${await (async () => {
-				const names = [];
-				for (const memberId of team.memberIds) {
-					names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).nickname);
-				};
-				return names.join(", ");
-			})()}?`,
+			content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMates.map(member => member.user.username).join(", ")}?`,
 			components: [
 				new MessageActionRow().addComponents(
 					new MessageButton()
@@ -470,16 +528,15 @@ const teamFunctions = {
 			],
 		});
 		// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-		const nextInteraction = await (async () => {
-			try {
-				return await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
-					filter: interaction => interaction.user.id === caller.id,
-					time: 10_000,
-				});
-			} catch (e) {
-				return undefined;
-			}
-		})();
+		let nextInteraction;
+		try {
+			nextInteraction = await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
+				filter: (interaction: { user: { id: any; }; }) => interaction.user.id === caller.id,
+				time: 10_000,
+			});
+		} catch (e) {
+			nextInteraction = undefined;
+		}
 		if (nextInteraction == null) {
 			await interaction.editReply({ content: `Confirmation timed out`, components: [] });
 			return;
@@ -504,13 +561,13 @@ const teamFunctions = {
 			waiting: [...team.memberIds],
 			approved: [],
 			rejected: [],
-			caller: (await findUser(transaction, { discordUserId: caller.id })).id,
+			caller: (await findUser(transaction, { discordUserId: caller.id }))!.id,
 		});
 		// complete command and commit transaction
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
 		await interaction.editReply({
-			content: `Awaiting approval from team ${teamName} with members ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to approve ${caller} joining`,
+			content: `Awaiting approval from team ${teamName} with members ${teamMates.map(member => member.toString()).join(", ")} to approve ${caller} joining`,
 			components: [
 				new MessageActionRow().addComponents(
 					new MessageButton()
@@ -529,7 +586,8 @@ const teamFunctions = {
 			],
 		});
 	},
-	async rename(interaction, metadata) {
+	async rename(interaction: CommandInteraction, metadata: any) {
+		assert(interaction.guild);
 		const newTeamName = interaction.options.getString("new-team-name", true);
 		// log command and setup transaction
 		console.log([ "team2", "rename", newTeamName, metadata ]);
@@ -541,7 +599,7 @@ const teamFunctions = {
 			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 		}
 		// fail if caller isn't in a team
-		if ((await findUser(transaction, { discordUserId: caller.id })).teamId == null) {
+		if (callerUser.teamId == null) {
 			await interaction.editReply(`You are not in a team`);
 			return;
 		}
@@ -555,6 +613,11 @@ const teamFunctions = {
 			await interaction.editReply(`Team called ${newTeamName} already exists`);
 			return;
 		}
+		const team = await fetchTeam(transaction, callerUser.teamId);
+		const teamMates = [];
+		for (const memberId of team.memberIds) {
+			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+		};
 		// create delayed interaction info
 		const message = await interaction.fetchReply();
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
@@ -573,7 +636,7 @@ const teamFunctions = {
 		await transaction.commit();
 		// create message that has buttons for confirming stuff
 		await interaction.editReply({
-			content: `Awaiting approval from team members ${teamMates.map(teamMate => teamMate.toString()).join(", ")} to approve renaming team to ${newTeamName}`,
+			content: `Awaiting approval from team members ${teamMates.filter(member => member.id !== caller.id).map(member => member.toString()).join(", ")} to approve renaming team to ${newTeamName}`,
 			components: [
 				new MessageActionRow().addComponents(
 					new MessageButton()
@@ -592,7 +655,7 @@ const teamFunctions = {
 			],
 		});
 	},
-	async leave(interaction, metadata) {
+	async leave(interaction: { user: any; guild: any; id: any; editReply: (arg0: string) => any; }, metadata: any) {
 		// log command and setup transaction
 		console.log([ "team2", "leave", metadata ]);
 		const transaction = createTransaction(resources);
@@ -603,7 +666,7 @@ const teamFunctions = {
 			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 		}
 		// fail if caller isn't in a team
-		if ((await findUser(transaction, { discordUserId: caller.id })).teamId == null) {
+		if (callerUser.teamId == null) {
 			await interaction.editReply(`You are not in a team`);
 			return;
 		}
@@ -618,7 +681,9 @@ const teamFunctions = {
 			"please DM a leader for further action. Thanks :D",
 		].join(" "));
 	},
-	"join-random": async (interaction, metadata) => {
+	"join-random": async (interaction: CommandInteraction, metadata: any) => {
+		assert(interaction.guild);
+		assert(interaction.channel);
 		// log command and setup transaction
 		console.log([ "team2", "join-random", metadata ]);
 		const transaction = createTransaction(resources);
@@ -629,7 +694,7 @@ const teamFunctions = {
 			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 		}
 		// fail if caller is in a team
-		if ((await findUser(transaction, { discordUserId: caller.id })).teamId != null) {
+		if (callerUser.teamId != null) {
 			await interaction.editReply(`You are already in a team`);
 			return;
 		}
@@ -647,7 +712,7 @@ const teamFunctions = {
 			await joinTeam(interaction.guild, transaction, team, otherUser);
 			await joinTeam(interaction.guild, transaction, team, callerUser);
 			// remove previous message and clear info
-			(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId)).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+			(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
 			removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
 			clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
 			clearObject(joinRandomInfo);
@@ -657,7 +722,7 @@ const teamFunctions = {
 			return;
 		}
 		// create delayed interaction info
-		const message = await interaction.fetchReply();
+		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -700,7 +765,7 @@ const reactions = await message.awaitReactions({ filter, max: 1, time: 60_000 })
 */
 
 // Process button interactions
-client.on("interactionCreate", async interaction => {
+client.on("interactionCreate", async (interaction: Interaction) => {
 	if (!interaction.isButton())
 		return;
 	await interaction.deferUpdate();
@@ -712,128 +777,114 @@ client.on("interactionCreate", async interaction => {
 		customId: interaction.customId,
 	});
 	try {
+		assert(interaction.guild);
+		assert(interaction.channel);
+		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+		const caller = await interaction.guild.members.fetch(interaction.user.id);
 		const transaction = createTransaction(resources);
-		const caller = interaction.user;
 		if (!((await transaction.fetch(`/interactions`)).interactionIds ?? []).includes(interaction.message.id)) {
 			// await interaction.editReply(`Could not find interaction to continue`);
 			console.log("unknown interaction");
 			return;
 		}
 		const info = await transaction.fetch(`/interaction/${interaction.message.id}`);
-		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
 		if (info.type === "teamCreate") {
-			const team = await fetchTeam(transaction, info.teamId);
-			const callerUser = await findUser(transaction, { discordUserId: caller.id });
+			// ensure caller
+			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			if (callerUser == null) {
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+			}
 			if (interaction.customId === "accept") {
-				if (team.caller === callerUser.id) {
+				if (info.caller === callerUser.id) {
 					await message.reply(`Caller cannot accept own invitation`);
 					return;
-				} else if (team.accepted.includes(callerUser.id)) {
+				} else if (info.accepted.includes(callerUser.id)) {
 					await message.reply(`Caller cannot accept invitation again`);
 					return;
-				} else if (team.declined.includes(callerUser.id)) {
+				} else if (info.declined.includes(callerUser.id)) {
 					await message.reply(`Caller cannot accept invitation after declining`);
 					return;
-				} else if (!team.waiting.includes(callerUser.id)) {
+				} else if (!info.waiting.includes(callerUser.id)) {
 					await message.reply(`Caller wasn't invited`);
 					return;
 				}
-				removeFromArray(team.waiting, callerUser.id);
-				team.accepted.push(callerUser.id);
-				await joinTeam(interaction.guild, transaction, team, callerUser);
-				if (team.accepted.length >= 1) {
-					for (const waiting of team.waiting) {
-						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, waiting));
+				removeFromArray(info.waiting, callerUser.id);
+				info.accepted.push(callerUser.id);
+				if (info.accepted.length >= 1) {
+					// fail if another team with same name exists
+					if (await findTeam(transaction, { name: info.futureTeamName }) != null) {
+						await message.reply(`Team called ${info.futureTeamName} now exists`);
+						return;
+					}
+					// create team
+					const team = await createTeam(interaction.guild, transaction, {
+						id: info.futureTeamId,
+						name: info.futureTeamName,
+					});
+					for (const userId of [info.caller, ...info.accepted, ...info.declined, ...info.waiting]) {
+						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, userId));
 					}
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
-					delete team.waiting;
-					delete team.accepted;
-					delete team.declined;
-					delete team.caller;
-					team.incomplete = false;
+					const teamMates = [];
+					for (const memberId of team.memberIds) {
+						teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+					};
 					await transaction.commit();
-					await message.reply(`Team ${team.name} with members ${await (async () => {
-						const names = [];
-						for (const memberId of team.memberIds) {
-							names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).toString());
-						};
-						return names.join(", ");
-					})()} is created`);
+					await message.reply(`Team ${team.name} with members ${teamMates.map(member => member.toString()).join(", ")} is created`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Accepted invitation to ${team.name}`);
+				await message.reply(`Accepted invitation to ${info.futureTeamName}`);
 				return;
 			}
 			if (interaction.customId === "decline") {
-				if (team.caller === callerUser.id) {
+				if (info.caller === callerUser.id) {
 					await message.reply(`Caller cannot decline own invitation`);
 					return;
-				} else if (team.declined.includes(callerUser.id)) {
+				} else if (info.declined.includes(callerUser.id)) {
 					await message.reply(`Caller cannot decline invitation again`);
 					return;
-				} else if (team.accepted.includes(callerUser.id)) {
+				} else if (info.accepted.includes(callerUser.id)) {
 					await message.reply(`Caller cannot decline invitation after accepting`);
 					return;
-				} else if (!team.waiting.includes(callerUser.id)) {
+				} else if (!info.waiting.includes(callerUser.id)) {
 					await message.reply(`Caller wasn't invited`);
 					return;
 				}
-				removeFromArray(team.waiting, callerUser.id);
-				team.declined.push(callerUser.id);
-				if (team.waiting.length == 0) {
-					for (const accepted of [team.caller, ...team.accepted]) {
-						await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted));
-					}
-					await destroyTeam(interaction.guild, transaction, team);
+				removeFromArray(info.waiting, callerUser.id);
+				info.declined.push(callerUser.id);
+				if (info.waiting.length == 0) {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
-					delete team.waiting;
-					delete team.accepted;
-					delete team.declined;
-					delete team.caller;
 					await transaction.commit();
-					await message.reply(`Team ${team.name} will not be created`);
+					await message.reply(`Team ${info.futureTeamName} will not be created`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Declined invitation to ${team.name}`);
+				await message.reply(`Declined invitation to ${info.futureTeamName}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
-				if (team.caller !== callerUser.id) {
+				if (info.caller !== callerUser.id) {
 					await message.reply(`Caller isn't inviter`);
 					return;
 				}
-				for (const accepted of [team.caller, ...team.accepted]) {
-					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted));
-				}
-				const teamName = team.name;
-				await destroyTeam(interaction.guild, transaction, team);
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await message.reply(`Team ${teamName} cancelled`);
+				await message.reply(`Team ${info.futureTeamName} cancelled`);
 				return;
 			}
-			/*
-			waiting: await (async () => {
-				const waiting = [];
-				for (const teamMate of teamMates) {
-					waiting.push((await findUser(transaction, { discordUserId: teamMate.id })).id);
-				}
-				return waiting;
-			})(),
-			accepted: [],
-			declined: [],
-			caller: (await findUser(transaction, { discordUserId: caller.id })).id,
-			*/
 		}
 		if (info.type === "teamJoin") {
 			const team = await fetchTeam(transaction, info.teamId);
 			const numMembers = info.waiting.length + info.approved.length + info.declined.length;
-			const callerUser = await findUser(transaction, { discordUserId: caller.id });
+			// ensure caller
+			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			if (callerUser == null) {
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+			}
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id)) {
 					await message.reply(`Caller cannot approve join request again`);
@@ -851,18 +902,18 @@ client.on("interactionCreate", async interaction => {
 					// fail if team is full
 					if (info.memberIds.length >= 4) {
 						await transaction.commit();
-						await message.reply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s requested team is now full`);
+						await message.reply(`${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s requested team is now full`);
 						return;
 					}
 					await joinTeam(interaction.guild, transaction, team, callerUser);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)} joined team ${team.name}`);
+					await message.reply(`${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)} joined team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Approved request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
+				await message.reply(`Approved request from ${(await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)).user.username} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -882,11 +933,11 @@ client.on("interactionCreate", async interaction => {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await message.reply(`Rejected ${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s request to join team ${team.name}`);
+					await message.reply(`Rejected ${await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s request to join team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Rejected request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
+				await message.reply(`Rejected request from ${(await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId)).user.username} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -903,8 +954,12 @@ client.on("interactionCreate", async interaction => {
 		}
 		if (info.type === "teamRename") {
 			const team = await fetchTeam(transaction, info.teamId);
-			const numMembers = info.waiting.length + info.approved.length + info.declined.length;
-			const callerUser = await findUser(transaction, { discordUserId: caller.id });
+			const numMembers = info.waiting.length + info.approved.length + info.rejected.length;
+			// ensure caller
+			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			if (callerUser == null) {
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+			}
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id) {
 					await message.reply(`Caller cannot approve own rename request`);
@@ -980,7 +1035,11 @@ client.on("interactionCreate", async interaction => {
 			}
 		}
 		if (info.type === "teamJoinRandom") {
-			const callerUser = await findUser(transaction, { discordUserId: caller.id });
+			// ensure caller
+			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			if (callerUser == null) {
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
 					await message.reply(`Caller isn't join random requester`);
@@ -990,7 +1049,7 @@ client.on("interactionCreate", async interaction => {
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-				(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId)).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+				(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
@@ -1001,30 +1060,28 @@ client.on("interactionCreate", async interaction => {
 		if (info.type === "workshopRole") {
 			const workshop = await transaction.fetch(`/workshop/${info.workshopId}`);
 			if (interaction.customId === "add") {
-				await interaction.user.roles.add(workshop.discordRoleId);
+				await caller.roles.add(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.deleteReply();
 				return;
 			}
 			if (interaction.customId === "remove") {
-				await interaction.user.roles.remove(workshop.discordRoleId);
+				await caller.roles.remove(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.deleteReply();
 				return;
 			}
 		}
 	} catch (e) {
 		console.error(e);
 		try {
-			await message.reply(`Oops, an internal error occurred: ${e}`);
+			await interaction.followUp(`Oops, an internal error occurred: ${e}`);
 		} catch (e) {}
 	}
 });
 
 // Process slash commands
-client.on("interactionCreate", async interaction => {
+client.on("interactionCreate", async (interaction: Interaction) => {
 	if (!interaction.isCommand())
 		return;
 
@@ -1037,6 +1094,8 @@ client.on("interactionCreate", async interaction => {
 			userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
 			userId: interaction.user.id,
 		};
+		assert(interaction.guild);
+		assert(interaction.channel);
 
 		if (interaction.commandName === "ping") {
 			await interaction.editReply("pong");
@@ -1044,13 +1103,16 @@ client.on("interactionCreate", async interaction => {
 		}
 
 		if (interaction.commandName === "admin") {
-			if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find(role => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
+			const caller = await interaction.guild.members.fetch(interaction.user.id);
+			if (!caller.roles.cache.find((role: Role) => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
 				await interaction.editReply(`You are not an admin`);
 				return;
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
+				assert(client.application);
 				const owner = (await client.application.fetch()).owner;
+				assert(owner);
 				const userId = interaction.user.id;
 				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
 					await interaction.editReply(`You are not the bot owner`);
@@ -1062,7 +1124,7 @@ client.on("interactionCreate", async interaction => {
 				let result = await resources.fetch(resource.trim());
 				for (const property of properties)
 					result = result?.[property.trim()];
-				let out;
+				let out: string;
 				if (result === undefined)
 					out = "*undefined*";
 				else {
@@ -1076,7 +1138,9 @@ client.on("interactionCreate", async interaction => {
 				return;
 			}
 			if (subcommandName === "set") {
+				assert(client.application);
 				const owner = (await client.application.fetch()).owner;
+				assert(owner);
 				const userId = interaction.user.id;
 				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
 					await interaction.editReply(`You are not the bot owner`);
@@ -1113,7 +1177,7 @@ client.on("interactionCreate", async interaction => {
 			}
 			if (subcommandName === "remove-from-team") {
 				const teamName = interaction.options.getString("team-name", true);
-				const member = interaction.options.getMember("member", true);
+				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
 				console.log([ "admin", "remove-from-team", teamName, member, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if user doesnt exist
@@ -1150,15 +1214,13 @@ client.on("interactionCreate", async interaction => {
 					await interaction.editReply(`Team does not exist`);
 					return;
 				}
+				const teamMates = [];
+				for (const memberId of team.memberIds) {
+					teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+				};
 				// confirmation with a list of ppl in the team
 				await interaction.editReply({
-					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${await (async () => {
-						const names = [];
-						for (const memberId of team.memberIds) {
-							names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).nickname);
-						};
-						return names.join(", ");
-					})()}?`,
+					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(teamMate => teamMate.user.username).join(", ")}?`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
@@ -1173,16 +1235,15 @@ client.on("interactionCreate", async interaction => {
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-				const nextInteraction = await (async () => {
-					try {
-						return await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
-							filter: i => i.user.id === interaction.user.id,
-							time: 10_000,
-						});
-					} catch (e) {
-						return undefined;
-					}
-				})();
+				let nextInteraction;
+				try {
+					nextInteraction = await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
+						filter: (interaction: { user: { id: any; }; }) => interaction.user.id === caller.id,
+						time: 10_000,
+					});
+				} catch (e) {
+					nextInteraction = undefined;
+				}
 				if (nextInteraction == null) {
 					await interaction.editReply({ content: `Confirmation timed out`, components: [] });
 					return;
@@ -1239,12 +1300,13 @@ client.on("interactionCreate", async interaction => {
 				}
 				// move everyone in a workshop to their respective teams if they have one
 				const channel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
-				for (const [memberId, member] of channel.members) {
+				assert(channel);
+				for (const [memberId, member] of channel.members.entries()) {
 					let user = await findUser(transaction, { discordUserId: memberId });
 					if (user == null) continue;
 					if (user.teamId == null) continue;
 					const team = await fetchTeam(transaction, user.teamId);
-					const teamVoiceChannel = await interaction.guild.channels.fetch(team.discordVoiceChannelId);
+					const teamVoiceChannel = await interaction.guild.channels.fetch(team.discordVoiceChannelId) as VoiceChannel;
 					await member.edit({ channel: teamVoiceChannel });
 					await sleep(250);  // hopefully this is enough lol
 				}
@@ -1265,19 +1327,19 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				// fail if no workshops category exists
-				const workshopsCategory = (await interaction.guild.channels.fetch()).find(channel => (
+				const workshopsCategory = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
 					channel instanceof CategoryChannel
 					&& channel.name.toLowerCase() === "workshops"
-				));
+				)) as CategoryChannel | undefined;
 				if (workshopsCategory == null) {
 					await interaction.editReply(`No workshops category exists`);
 					return;
 				}
 				// fail if no workshops channel exists
-				const workshopsChannel = (await interaction.guild.channels.fetch()).children.find(channel => (
+				const workshopsChannel = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
 					channel instanceof TextChannel
 					&& channel.name.toLowerCase() === "workshops"
-				));
+				)) as TextChannel | undefined;
 				if (workshopsChannel == null) {
 					await interaction.editReply(`No workshops channel exists`);
 					return;
@@ -1297,8 +1359,8 @@ client.on("interactionCreate", async interaction => {
 					workshopId: workshop.id,
 				});
 				// create workshop role
-				const role = await guild.roles.create({ name: `${workshopName}` });
-				team.discordRoleId = role.id;
+				const role = await interaction.guild.roles.create({ name: `${workshopName}` });
+				workshop.discordRoleId = role.id;
 				// create workshop channels
 				const channelOptions = { parent: workshopsCategory };
 				const textChannel = await interaction.guild.channels.create(`${workshopName}`, { ...channelOptions });
@@ -1342,6 +1404,7 @@ client.on("interactionCreate", async interaction => {
 				// get team
 				const teamId = user.teamId;
 				const teamName = teamId && (await fetchTeam(resources, teamId)).name;
+				/*
 				// get points this month
 				const pointsThisMonth = [...user.pointEvents || []].reduce((points, { type, deltaPoints }) => {
 					if (type == "add") {
@@ -1357,6 +1420,8 @@ client.on("interactionCreate", async interaction => {
 						return numMedals + 1;
 					}
 				}, 0);
+				*/
+				const pointsThisMonth = 0; const numMedals = 0;
 				// build response
 				const parts = [];
 				parts.push(`Summary for ${metadata.userDisplayName}`);
