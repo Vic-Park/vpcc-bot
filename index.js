@@ -481,20 +481,20 @@ const teamFunctions = {
 			}
 		})();
 		if (nextInteraction == null) {
-			await interaction.editReply(`Confirmation timed out`);
+			await interaction.editReply({ content: `Confirmation timed out`, components: [] });
 			return;
 		}
 		if (nextInteraction.customId === "no") {
-			await interaction.editReply(`Cancelled join request`);
+			await interaction.editReply({ content: `Cancelled join request`, components: [] });
 			return;
 		}
 		// fail if team is full
 		if (team.memberIds.length >= 4) {
-			await interaction.editReply(`Requested team is full`);
+			await interaction.followUp(`Requested team is full`);
 			return;
 		}
 		// create delayed interaction info
-		const message = await interaction.fetchReply();
+		const message = await interaction.followUp({ content: ".", fetchReply: true });
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -708,7 +708,8 @@ client.on("interactionCreate", async interaction => {
 		timestamp: Date.now(),
 		userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
 		userId: interaction.user.id,
-		interaction,
+		messageId: interaction.message.id,
+		customId: interaction.customId,
 	});
 	try {
 		const transaction = createTransaction(resources);
@@ -719,21 +720,22 @@ client.on("interactionCreate", async interaction => {
 			return;
 		}
 		const info = await transaction.fetch(`/interaction/${interaction.message.id}`);
+		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
 		if (info.type === "teamCreate") {
 			const team = await fetchTeam(transaction, info.teamId);
 			const callerUser = await findUser(transaction, { discordUserId: caller.id });
 			if (interaction.customId === "accept") {
 				if (team.caller === callerUser.id) {
-					await interaction.editReply(`Caller cannot accept own invitation`);
+					await message.reply(`Caller cannot accept own invitation`);
 					return;
 				} else if (team.accepted.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot accept invitation again`);
+					await message.reply(`Caller cannot accept invitation again`);
 					return;
 				} else if (team.declined.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot accept invitation after declining`);
+					await message.reply(`Caller cannot accept invitation after declining`);
 					return;
 				} else if (!team.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller wasn't invited`);
+					await message.reply(`Caller wasn't invited`);
 					return;
 				}
 				removeFromArray(team.waiting, callerUser.id);
@@ -741,7 +743,7 @@ client.on("interactionCreate", async interaction => {
 				await joinTeam(interaction.guild, transaction, team, callerUser);
 				if (team.accepted.length >= 1) {
 					for (const waiting of team.waiting) {
-						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, waiting.id));
+						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, waiting));
 					}
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
@@ -751,7 +753,7 @@ client.on("interactionCreate", async interaction => {
 					delete team.caller;
 					team.incomplete = false;
 					await transaction.commit();
-					await interaction.editReply(`Team ${team.name} with members ${await (async () => {
+					await message.reply(`Team ${team.name} with members ${await (async () => {
 						const names = [];
 						for (const memberId of team.memberIds) {
 							names.push((await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId)).toString());
@@ -761,28 +763,28 @@ client.on("interactionCreate", async interaction => {
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Accepted invitation to ${team.name}`);
+				await message.reply(`Accepted invitation to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "decline") {
 				if (team.caller === callerUser.id) {
-					await interaction.editReply(`Caller cannot decline own invitation`);
+					await message.reply(`Caller cannot decline own invitation`);
 					return;
 				} else if (team.declined.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot decline invitation again`);
+					await message.reply(`Caller cannot decline invitation again`);
 					return;
 				} else if (team.accepted.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot decline invitation after accepting`);
+					await message.reply(`Caller cannot decline invitation after accepting`);
 					return;
 				} else if (!team.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller wasn't invited`);
+					await message.reply(`Caller wasn't invited`);
 					return;
 				}
 				removeFromArray(team.waiting, callerUser.id);
 				team.declined.push(callerUser.id);
 				if (team.waiting.length == 0) {
 					for (const accepted of [team.caller, ...team.accepted]) {
-						await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted.id));
+						await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted));
 					}
 					await destroyTeam(interaction.guild, transaction, team);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -792,26 +794,27 @@ client.on("interactionCreate", async interaction => {
 					delete team.declined;
 					delete team.caller;
 					await transaction.commit();
-					await interaction.editReply(`Team ${team.name} will not be created`);
+					await message.reply(`Team ${team.name} will not be created`);
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Declined invitation to ${team.name}`);
+				await message.reply(`Declined invitation to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (team.caller !== callerUser.id) {
-					await interaction.editReply(`Caller isn't inviter`);
+					await message.reply(`Caller isn't inviter`);
 					return;
 				}
 				for (const accepted of [team.caller, ...team.accepted]) {
-					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted.id));
+					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, accepted));
 				}
+				const teamName = team.name;
 				await destroyTeam(interaction.guild, transaction, team);
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await interaction.editReply(`Team ${team.name} cancelled`);
+				await message.reply(`Team ${teamName} cancelled`);
 				return;
 			}
 			/*
@@ -833,13 +836,13 @@ client.on("interactionCreate", async interaction => {
 			const callerUser = await findUser(transaction, { discordUserId: caller.id });
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot approve join request again`);
+					await message.reply(`Caller cannot approve join request again`);
 					return;
 				} else if (info.rejected.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot approve join request after rejecting`);
+					await message.reply(`Caller cannot approve join request after rejecting`);
 					return;
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller not in team`);
+					await message.reply(`Caller not in team`);
 					return;
 				}
 				removeFromArray(info.waiting, callerUser.id);
@@ -848,29 +851,29 @@ client.on("interactionCreate", async interaction => {
 					// fail if team is full
 					if (info.memberIds.length >= 4) {
 						await transaction.commit();
-						await interaction.editReply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s requested team is now full`);
+						await message.reply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s requested team is now full`);
 						return;
 					}
 					await joinTeam(interaction.guild, transaction, team, callerUser);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await interaction.editReply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)} joined team ${team.name}`);
+					await message.reply(`${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)} joined team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Approved request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
+				await message.reply(`Approved request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "reject") {
 				if (info.rejected.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot reject join request again`);
+					await message.reply(`Caller cannot reject join request again`);
 					return;
 				} else if (info.approved.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot reject join request after approving`);
+					await message.reply(`Caller cannot reject join request after approving`);
 					return;
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller not in team`);
+					await message.reply(`Caller not in team`);
 					return;
 				}
 				removeFromArray(info.waiting, callerUser.id);
@@ -879,22 +882,22 @@ client.on("interactionCreate", async interaction => {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await interaction.editReply(`Rejected ${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s request to join team ${team.name}`);
+					await message.reply(`Rejected ${await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)}'s request to join team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Rejected request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
+				await message.reply(`Rejected request from ${(await interaction.guild.fetch((await fetchUser(transaction, info.caller)).discordUserId)).nickname} to ${team.name}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await interaction.editReply(`Caller isn't join requester`);
+					await message.reply(`Caller isn't join requester`);
 					return;
 				}
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await interaction.editReply(`Request to join ${team.name} was cancelled`);
+				await message.reply(`Request to join ${team.name} was cancelled`);
 				return;
 			}
 		}
@@ -904,16 +907,16 @@ client.on("interactionCreate", async interaction => {
 			const callerUser = await findUser(transaction, { discordUserId: caller.id });
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id) {
-					await interaction.editReply(`Caller cannot approve own rename request`);
+					await message.reply(`Caller cannot approve own rename request`);
 					return;
 				} else if (info.approved.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot approve rename request again`);
+					await message.reply(`Caller cannot approve rename request again`);
 					return;
 				} else if (info.rejected.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot approve rename request after rejecting`);
+					await message.reply(`Caller cannot approve rename request after rejecting`);
 					return;
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller not in team`);
+					await message.reply(`Caller not in team`);
 					return;
 				}
 				removeFromArray(info.waiting, callerUser.id);
@@ -923,32 +926,32 @@ client.on("interactionCreate", async interaction => {
 					// fail if another team with same name exists
 					if (await findTeam(transaction, { name: info.newTeamName }) != null) {
 						await transaction.commit();
-						await interaction.editReply(`Team called ${info.newTeamName} now exists`);
+						await message.reply(`Team called ${info.newTeamName} now exists`);
 						return;
 					}
 					await renameTeam(interaction.guild, transaction, team, info.newTeamName);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await interaction.editReply(`Renamed team ${oldTeamName} to ${team.name}`);
+					await message.reply(`Renamed team ${oldTeamName} to ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Approved rename request from ${team.name} to ${info.newTeamName}`);
+				await message.reply(`Approved rename request from ${team.name} to ${info.newTeamName}`);
 				return;
 			}
 			if (interaction.customId === "reject") {
 				if (info.caller === callerUser.id) {
-					await interaction.editReply(`Caller cannot reject own rename request`);
+					await message.reply(`Caller cannot reject own rename request`);
 					return;
 				} else if (info.rejected.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot reject rename request again`);
+					await message.reply(`Caller cannot reject rename request again`);
 					return;
 				} else if (info.approved.includes(callerUser.id)) {
-					await interaction.editReply(`Caller cannot reject rename request after approving`);
+					await message.reply(`Caller cannot reject rename request after approving`);
 					return;
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await interaction.editReply(`Caller not in team`);
+					await message.reply(`Caller not in team`);
 					return;
 				}
 				removeFromArray(info.waiting, callerUser.id);
@@ -957,22 +960,22 @@ client.on("interactionCreate", async interaction => {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
-					await interaction.editReply(`Request to rename team ${team.name} to ${info.newTeamName} is rejected`);
+					await message.reply(`Request to rename team ${team.name} to ${info.newTeamName} is rejected`);
 					return;
 				}
 				await transaction.commit();
-				await interaction.editReply(`Rejected rename request from ${team.name} to ${info.newTeamName}`);
+				await message.reply(`Rejected rename request from ${team.name} to ${info.newTeamName}`);
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await interaction.editReply(`Caller isn't rename requester`);
+					await message.reply(`Caller isn't rename requester`);
 					return;
 				}
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await interaction.editReply(`Request to rename team ${team.name} to ${info.newTeamName} is cancelled`);
+				await message.reply(`Request to rename team ${team.name} to ${info.newTeamName} is cancelled`);
 				return;
 			}
 		}
@@ -980,7 +983,7 @@ client.on("interactionCreate", async interaction => {
 			const callerUser = await findUser(transaction, { discordUserId: caller.id });
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await interaction.editReply(`Caller isn't join random requester`);
+					await message.reply(`Caller isn't join random requester`);
 					return;
 				}
 				// remove interaction info and joinRandom info
@@ -991,7 +994,7 @@ client.on("interactionCreate", async interaction => {
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await interaction.editReply(`Cancelled join random request`);
+				await message.reply(`Cancelled join random request`);
 				return;
 			}
 		}
@@ -1015,7 +1018,7 @@ client.on("interactionCreate", async interaction => {
 	} catch (e) {
 		console.error(e);
 		try {
-			await interaction.editReply(`Oops, an internal error occurred: ${e}`);
+			await message.reply(`Oops, an internal error occurred: ${e}`);
 		} catch (e) {}
 	}
 });
@@ -1173,7 +1176,7 @@ client.on("interactionCreate", async interaction => {
 				const nextInteraction = await (async () => {
 					try {
 						return await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
-							filter: interaction => interaction.user.id === caller.id,
+							filter: i => i.user.id === interaction.user.id,
 							time: 10_000,
 						});
 					} catch (e) {
@@ -1181,11 +1184,11 @@ client.on("interactionCreate", async interaction => {
 					}
 				})();
 				if (nextInteraction == null) {
-					await interaction.editReply(`Confirmation timed out`);
+					await interaction.editReply({ content: `Confirmation timed out`, components: [] });
 					return;
 				}
 				if (nextInteraction.customId === "no") {
-					await interaction.editReply(`Cancelled team destruction`);
+					await interaction.followUp(`Cancelled team destruction`);
 					return;
 				}
 				// destroy team
@@ -1195,7 +1198,7 @@ client.on("interactionCreate", async interaction => {
 				await destroyTeam(interaction.guild, transaction, team);
 				// reply to interaction
 				await transaction.commit();
-				await interaction.editReply(`Destroyed team ${teamName}`);
+				await interaction.followUp(`Destroyed team ${teamName}`);
 				return;
 			}
 			if (subcommandName === "rename-team") {
