@@ -832,6 +832,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			console.log("unknown interaction");
 			return;
 		}
+		async function error(content: string) {
+			// const r = await message.reply(content);
+			try {
+				const r = await caller.send(content);
+			} catch (e) {}
+			// sleep(5000).then(() => r.fetch().then(r => r.delete()));
+		}
+		
 		const info = await transaction.fetch(`/interaction/${interaction.message.id}`);
 		if (info.type === "teamCreate") {
 			// ensure caller
@@ -841,25 +849,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "accept") {
 				if (info.caller === callerUser.id) {
-					await message.reply(`Caller cannot accept own invitation`);
-					return;
+					return await error(`You cannot accept own invitation`);
 				} else if (info.accepted.includes(callerUser.id)) {
-					await message.reply(`Caller cannot accept invitation again`);
-					return;
+					return await error(`You cannot accept invitation again`);
 				} else if (info.declined.includes(callerUser.id)) {
-					await message.reply(`Caller cannot accept invitation after declining`);
-					return;
+					return await error(`You cannot accept invitation after declining`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller wasn't invited`);
-					return;
+					return await error(`You weren't invited`);
 				}
 				// fail if caller is already in a team
 				if (callerUser.teamId != null) {
-					await transaction.commit();
-					await message.reply(`Caller is on a team`);
-					return;
+					return await error(`You are on a team`);
 				}
-				if (info.accepted.length === 1) {
+				if (info.accepted.length === 0) {
 					// fail if another team with same name exists
 					if (await findTeam(transaction, { name: info.futureTeamName }) != null) {
 						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -911,17 +913,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "decline") {
 				if (info.caller === callerUser.id) {
-					await message.reply(`Caller cannot decline own invitation`);
-					return;
+					return await error(`You cannot decline own invitation`);
 				} else if (info.declined.includes(callerUser.id)) {
-					await message.reply(`Caller cannot decline invitation again`);
-					return;
+					return await error(`You cannot decline invitation again`);
 				} else if (info.accepted.includes(callerUser.id)) {
-					await message.reply(`Caller cannot decline invitation after accepting`);
-					return;
+					return await error(`You cannot decline invitation after accepting`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller wasn't invited`);
-					return;
+					return await error(`You weren't invited`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.declined.push(callerUser.id);
@@ -939,8 +937,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await message.reply(`Caller isn't inviter`);
-					return;
+					return await error(`You aren't inviter`);
 				}
 				const teamName = info.futureTeamName;
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -960,14 +957,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id)) {
-					await message.reply(`Caller cannot approve join request again`);
-					return;
+					return await error(`You cannot approve join request again`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					await message.reply(`Caller cannot approve join request after rejecting`);
-					return;
+					return await error(`You cannot approve join request after rejecting`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller not in team`);
-					return;
+					return await error(`You are not in team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
@@ -1002,14 +996,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "reject") {
 				if (info.rejected.includes(callerUser.id)) {
-					await message.reply(`Caller cannot reject join request again`);
-					return;
+					return await error(`You cannot reject join request again`);
 				} else if (info.approved.includes(callerUser.id)) {
-					await message.reply(`Caller cannot reject join request after approving`);
-					return;
+					return await error(`You cannot reject join request after approving`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller not in team`);
-					return;
+					return await error(`You are not in team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
@@ -1027,8 +1018,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await message.reply(`Caller isn't join requester`);
-					return;
+					return await error(`You aren't join requester`);
 				}
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
@@ -1047,17 +1037,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id) {
-					await message.reply(`Caller cannot approve own rename request`);
-					return;
+					return await error(`You cannot approve own rename request`);
 				} else if (info.approved.includes(callerUser.id)) {
-					await message.reply(`Caller cannot approve rename request again`);
-					return;
+					return await error(`You cannot approve rename request again`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					await message.reply(`Caller cannot approve rename request after rejecting`);
-					return;
+					return await error(`You cannot approve rename request after rejecting`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller not in team`);
-					return;
+					return await error(`You are not in team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
@@ -1084,17 +1070,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "reject") {
 				if (info.caller === callerUser.id) {
-					await message.reply(`Caller cannot reject own rename request`);
-					return;
+					return await error(`You cannot reject own rename request`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					await message.reply(`Caller cannot reject rename request again`);
-					return;
+					return await error(`You cannot reject rename request again`);
 				} else if (info.approved.includes(callerUser.id)) {
-					await message.reply(`Caller cannot reject rename request after approving`);
-					return;
+					return await error(`You cannot reject rename request after approving`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					await message.reply(`Caller not in team`);
-					return;
+					return await error(`You are not in team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
@@ -1112,8 +1094,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await message.reply(`Caller isn't rename requester`);
-					return;
+					return await error(`You aren't rename requester`);
 				}
 				const teamName = info.newTeamName;
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -1131,8 +1112,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					await message.reply(`Caller isn't join random requester`);
-					return;
+					return await error(`You aren't join random requester`);
 				}
 				// remove interaction info and joinRandom info
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
