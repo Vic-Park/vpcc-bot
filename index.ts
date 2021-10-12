@@ -1401,6 +1401,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const workshopName = interaction.options.getString("workshop-name", true);
 				console.log([ "admin", "register-workshop", workshopCode, workshopName, metadata ]);
 				const transaction = createTransaction(resources);
+				// fail if workshop code has caps or spaces
+				if (!/^[-a-z0-9]+$/g.test(workshopCode)) {
+					await interaction.editReply(`Workshop code can only have lowercase letters and dashes`);
+					return;
+				}
 				// fail if workshop with code exists
 				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
 				if (workshop.id != null) {
