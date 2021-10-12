@@ -141,22 +141,6 @@ const commands = [
 			.setName("leave")
 			.setDescription("Leaves your team and destroys it if empty"))
 		.addSubcommand(subcommand => subcommand
-			.setName("auto-accept")
-			.setDescription("Set whether others can join your team without approval")
-			.addStringOption(option => option
-				.setName("auto-accept")
-				.setDescription("New value for auto accept")
-				.setRequired(false)
-				.addChoice("on", "on")
-				.addChoice("off", "off")))
-		.addSubcommand(subcommand => subcommand
-			.setName("create-free-to-join")
-			.setDescription("Set whether others can join your team without approval")
-			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of new team")
-				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
 			.setName("join-random")
 			.setDescription("Join a team that's free to join")),
 	new SlashCommandBuilder()
@@ -169,31 +153,6 @@ const commands = [
 			.setName("team-name")
 			.setDescription("Name of team")
 			.setRequired(false)),
-	new SlashCommandBuilder()
-		.setName("points")
-		.setDescription("Manages points")
-		.addSubcommand(subcommand => subcommand
-			.setName("give-team")
-			.setDescription("Gives a team a specified number of points")
-			.addStringOption(option => option
-				.setName("name")
-				.setDescription("Name of team")
-				.setRequired(true))
-			.addIntegerOption(option => option
-				.setName("points")
-				.setDescription("Amount of points to give")
-				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
-			.setName("give-voice")
-			.setDescription("Gives all teams with at least one member in a voice channel a specified number of points")
-			.addChannelOption(option => option
-				.setName("name")
-				.setDescription("Voice channel to target")
-				.setRequired(true))
-			.addIntegerOption(option => option
-				.setName("points")
-				.setDescription("Amount of points to give")
-				.setRequired(true))),
 ];
 
 const rest = new REST({ version: "9" }).setToken(process.env.BOT_TOKEN);
