@@ -6,7 +6,7 @@ const NodeCache = require("node-cache");
 const Keyv = require("keyv");
 const { KeyvFile } = require("keyv-file");
 const { Client, Intents, CategoryChannel, Permissions, User, MessageActionRow, MessageButton, TextChannel } = require("discord.js");
-const client = new Client({ intents: [ Intents.FLAGS.GUILDS ], rejectOnRateLimit: () => true });
+const client = new Client({ intents: [ Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS ], rejectOnRateLimit: () => true });
 
 client.on("ready", () => {
 	console.log(`Logged in as ${client.user.tag}`);
