@@ -1212,8 +1212,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					await interaction.editReply(`User is not in a team`);
 					return;
 				}
-				// get team
+				// fail if team name isn't easy
 				const team = await fetchTeam(transaction, user.teamId);
+				if (team.name !== teamName) {
+					await interaction.editReply(`User is in team called ${team.name}, not ${teamName}`);
+					return;
+				}
 				// leave previous team
 				await leaveTeam(interaction.guild, transaction, user);
 				// remove team if empty
