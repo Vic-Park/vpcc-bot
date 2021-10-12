@@ -86,7 +86,18 @@ const commands = [
 			.setDescription("Lists all teams and their ID"))
 		.addSubcommand(subcommand => subcommand
 			.setName("list-all-workshops")
-			.setDescription("Lists all workshops and their code")),
+			.setDescription("Lists all workshops and their code"))
+		.addSubcommand(subcommand => subcommand
+			.setName("delete-workshop")
+			.setDescription("Deletes a workshop")
+			.addStringOption(option => option
+				.setName("workshop-code")
+				.setDescription("Workshop code")
+				.setRequired(true))
+			.addBooleanOption(option => option
+				.setName("remove-from-datastore")
+				.setDescription("Whether to remove the workshop from the datastore (default: false)")
+				.setRequired(false))),
 	new SlashCommandBuilder()
 		.setName("profile")
 		.setDescription("Shows a summary of your profile")

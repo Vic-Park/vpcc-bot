@@ -1467,6 +1467,82 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				return;
 			}
+			if (subcommandName === "delete-workshop") {
+				const workshopCode = interaction.options.getString("workshop-code", true);
+				const removeFromDatastore = interaction.options.getBoolean("remove-from-datastore", false) ?? false;
+				console.log([ "admin", "delete-workshop", workshopCode, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if workshop doesnt exist
+				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
+				if (workshop.id == null) {
+					await interaction.editReply(`Workshop does not exist`);
+					return;
+				}
+				// confirmation
+				await interaction.editReply({
+					content: `Just to confirm, are you attempting to destroy ${workshop.name} with code ${workshop.id}`,
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId("yes")
+								.setLabel("Confirm")
+								.setStyle("SUCCESS"),
+							new MessageButton()
+								.setCustomId("no")
+								.setLabel("Cancel")
+								.setStyle("DANGER"),
+						),
+					],
+				});
+				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
+				let nextInteraction;
+				try {
+					nextInteraction = await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
+						filter: (interaction: { user: { id: any; }; }) => interaction.user.id === caller.id,
+						time: 10_000,
+					});
+				} catch (e) {
+					nextInteraction = undefined;
+				}
+				if (nextInteraction == null) {
+					await interaction.editReply({ content: `Confirmation timed out`, components: [] });
+					return;
+				}
+				if (nextInteraction.customId === "no") {
+					await interaction.followUp(`Cancelled workshop destruction`);
+					return;
+				}
+				// destroy workshop role
+				if (workshop.discordRoleId) {
+					const role = await interaction.guild.roles.fetch(workshop.discordRoleId);
+					assert(role);
+					await role.delete();
+				}
+				// destroy workshop channels
+				if (workshop.discordTextChannelId) {
+					const textChannel = await interaction.guild.channels.fetch(workshop.discordTextChannelId);
+					assert(textChannel);
+					await textChannel.delete();
+				}
+				if (workshop.discordVoiceChannelId) {
+					const voiceChannel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
+					assert(voiceChannel);
+					await voiceChannel.delete();
+				}
+				// destroy team if required
+				if (removeFromDatastore) {
+					removeFromArray((await transaction.fetch(`/workshops`)).ids ??= [], workshop.id);
+					clearObject(workshop);
+					// reply to interaction
+					await transaction.commit();
+					await interaction.followUp(`Destroyed workshop ${workshopCode} and removed it from the datastore`);
+					return;
+				}
+				// reply to interaction
+				await transaction.commit();
+				await interaction.followUp(`Destroyed workshop ${workshopCode}`);
+				return;
+			}
 		}
 
 		if (interaction.commandName === "profile") {
