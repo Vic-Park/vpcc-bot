@@ -358,7 +358,7 @@ async function checkJoinRandom() {
 	const transaction = createTransaction(resources);
 	// check if joinRandom info is past 30 minutes
 	const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-	if (joinRandomInfo.start == null || joinRandomInfo.start + 0.5 * 60_000 > Date.now())
+	if (joinRandomInfo.start == null || joinRandomInfo.start + 30 * 60_000 > Date.now())
 		return;
 	console.log("attempting to add user");
 	// loop through all teams and get a free to join team with the smallest team size
@@ -392,11 +392,15 @@ async function checkJoinRandom() {
 	await transaction.commit();
 	await channel.send(`${await guild.members.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
 }
-(async () => {
-	await sleep(5000);  // hopefully the bot has started by now
-	checkJoinRandom();
-})();
-setInterval(checkJoinRandom, 10_000);
+
+client.once("ready", async () => {
+	while (true) {
+		await Promise.all([
+			checkJoinRandom(),
+			sleep(60_000),
+		]);
+	}
+});
 
 const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<void>> = {
 	async create(interaction: CommandInteraction, metadata: any) {
