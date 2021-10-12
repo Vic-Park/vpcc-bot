@@ -1139,12 +1139,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
-				assert(client.application);
-				const owner = (await client.application.fetch()).owner;
-				assert(owner);
-				const userId = interaction.user.id;
-				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
-					await interaction.editReply(`You are not the bot owner`);
+				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
+					await interaction.editReply(`You are not a bot maintainer`);
 					return;
 				}
 				const key = interaction.options.getString("key", true);
@@ -1167,12 +1163,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "set") {
-				assert(client.application);
-				const owner = (await client.application.fetch()).owner;
-				assert(owner);
-				const userId = interaction.user.id;
-				if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
-					await interaction.editReply(`You are not the bot owner`);
+				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
+					await interaction.editReply(`You are not a bot maintainer`);
 					return;
 				}
 				const key = interaction.options.getString("key", true);
