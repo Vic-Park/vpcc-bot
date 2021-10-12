@@ -624,7 +624,6 @@ const teamFunctions = {
 			return;
 		}
 		// get joinRandom info
-		const message = await interaction.fetchReply();
 		const joinRandomInfo = await transaction.fetch(`/joinRandom`);
 		// if there's another person tryna join a team
 		if ("start" in joinRandomInfo) {
@@ -1116,9 +1115,8 @@ client.on("interactionCreate", async interaction => {
 					await interaction.editReply(`User is not in a team`);
 					return;
 				}
-				// get team name
+				// get team
 				const team = await fetchTeam(transaction, user.teamId);
-				const teamName = team.name;
 				// leave previous team
 				await leaveTeam(interaction.guild, transaction, user);
 				// remove team if empty
@@ -1136,7 +1134,6 @@ client.on("interactionCreate", async interaction => {
 				const transaction = createTransaction(resources);
 				// fail if team doesnt exist
 				const team = await findTeam(transaction, { name: teamName });
-				const teamName = team.name;
 				if (team == null) {
 					await interaction.editReply(`Team does not exist`);
 					return;
@@ -1193,7 +1190,6 @@ client.on("interactionCreate", async interaction => {
 				const transaction = createTransaction(resources);
 				// fail if team doesnt exist
 				const team = await findTeam(transaction, { name: teamName });
-				const teamName = team.name;
 				if (team == null) {
 					await interaction.editReply(`Team does not exist`);
 					return;
