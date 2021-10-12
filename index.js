@@ -1015,11 +1015,9 @@ client.on("interactionCreate", async interaction => {
 		}
 
 		if (interaction.commandName === "admin") {
-			const owner = (await client.application.fetch()).owner;
-			const userId = interaction.user.id;
-			console.log(owner);
-			if (!(owner instanceof User ? owner.id === userId : owner.members.has(userId))) {
-				await interaction.editReply(`You are not the bot owner`);
+			const user = interaction.user;
+			if (!user.roles.find(role => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
+				await interaction.editReply(`You are not an admin`);
 				return;
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
