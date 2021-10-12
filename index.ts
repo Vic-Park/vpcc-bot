@@ -1379,6 +1379,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					type: "workshopRole",
 					workshopId: workshop.id,
 				});
+				workshop.interactionId = message.id;
 				// create workshop role
 				const role = await interaction.guild.roles.create({ name: `${workshopName}` });
 				workshop.discordRoleId = role.id;
@@ -1512,6 +1513,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (nextInteraction.customId === "no") {
 					await interaction.followUp(`Cancelled workshop destruction`);
 					return;
+				}
+				// destroy workshop interaction
+				if (workshop.interactionId) {
+					removeFromArray((await transaction.fetch(`/interactions`)).ids ??= [], workshop.interactionId);
+					clearObject(await transaction.fetch(`/interaction/${workshop.interactionId}`));
 				}
 				// destroy workshop role
 				if (workshop.discordRoleId) {
