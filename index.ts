@@ -807,7 +807,11 @@ const reactions = await message.awaitReactions({ filter, max: 1, time: 60_000 })
 client.on("interactionCreate", async (interaction: Interaction) => {
 	if (!interaction.isButton())
 		return;
-	await interaction.deferUpdate();
+	try {
+		await interaction.deferUpdate();
+	} catch (e) {
+		console.log(e);
+	}
 	console.log({
 		timestamp: Date.now(),
 		userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
