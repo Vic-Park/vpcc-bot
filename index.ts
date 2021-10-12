@@ -698,9 +698,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// create message with further instructions for leaving a team
 		await interaction.editReply([
 			"Hello! It seems you want to leave your team. ",
-			"There are many risks with leaving a team, such as",
+			"There are many consequences with leaving a team, such as",
 			"not being able to join back, no points being awarded to you after this month, and more.",
-			"If you understand these risks and still wish to continue,",
+			"If you understand these consequences and still wish to continue,",
 			"please DM a leader for further action. Thanks :D",
 		].join(" "));
 	},
