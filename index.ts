@@ -1387,6 +1387,66 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				})
 				return;
 			}
+			if (subcommandName === "list-all-teams") {
+				console.log([ "admin", "list-all-teams", metadata ]);
+				const result = [];
+				let first = true;
+				for (const teamId of (await fetchTeams(resources)).teamIds) {
+					const team = await fetchTeam(resources, teamId);
+					const teamMates = [];
+					for (const memberId of team.memberIds) {
+						teamMates.push(await interaction.guild.members.fetch((await fetchUser(resources, memberId)).discordUserId));
+					};
+					result.push(`Team ${team.name} with ID ${team.id} and members ${teamMates.map(member => member.user.username).join(", ")}`);
+					if (result.length >= 8) {
+						if (first) {
+							await interaction.editReply(result.join("\n"));
+							first = false;
+						} else {
+							await interaction.followUp(result.join("\n"));
+						}
+						result.splice(0, result.length);
+					}
+				}
+				if (result.length > 0) {
+					if (first) {
+						await interaction.editReply(result.join("\n"));
+					} else {
+						await interaction.followUp(result.join("\n"));
+					}
+				} else if (first) {
+					await interaction.editReply("no teams :/");
+				}
+				return;
+			}
+			if (subcommandName === "list-all-workshops") {
+				console.log([ "admin", "list-all-workshops", metadata ]);
+				const result = [];
+				let first = true;
+				for (const workshopId of (await resources.fetch(`/workshops`)).ids ??= []) {
+					const workshop = await resources.fetch(`/workshop/${workshopId}`);
+					result.push(`${workshop.name} with code ${workshop.id} hosted by ${(await interaction.guild.members.fetch(workshop.hostDiscordUserId)).user.username}`);
+					if (result.length >= 8) {
+						if (first) {
+							await interaction.editReply(result.join("\n"));
+							first = false;
+						} else {
+							await interaction.followUp(result.join("\n"));
+						}
+						result.splice(0, result.length);
+					}
+				}
+				if (result.length > 0) {
+					if (first) {
+						await interaction.editReply(result.join("\n"));
+					} else {
+						await interaction.followUp(result.join("\n"));
+					}
+				} else if (first) {
+					await interaction.editReply("no workshops :/");
+				}
+				return;
+			}
 		}
 
 		if (interaction.commandName === "profile") {

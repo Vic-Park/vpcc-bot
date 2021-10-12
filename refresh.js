@@ -80,7 +80,13 @@ const commands = [
 			.addStringOption(option => option
 				.setName("workshop-name")
 				.setDescription("Workshop name")
-				.setRequired(true))),
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("list-all-teams")
+			.setDescription("Lists all teams and their ID"))
+		.addSubcommand(subcommand => subcommand
+			.setName("list-all-workshops")
+			.setDescription("Lists all workshops and their code")),
 	new SlashCommandBuilder()
 		.setName("profile")
 		.setDescription("Shows a summary of your profile")
