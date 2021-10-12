@@ -169,6 +169,7 @@ type TeamData = {
 	discordTextChannelId: string,
 	discordVoiceChannelId: string,
 	freeToJoin?: boolean,
+	pointEvents?: Record<string, any>,
 }
 
 type UserData = {
@@ -363,36 +364,41 @@ async function checkJoinRandom() {
 	if (joinRandomInfo.start == null || joinRandomInfo.start + 30 * 60_000 > Date.now())
 		return;
 	console.log("attempting to add user");
-	// loop through all teams and get a free to join team with the smallest team size
-	let bestTeam = undefined;
-	for (const teamId of (await fetchTeams(transaction)).teamIds ?? []) {
-		const team = await fetchTeam(transaction, teamId);
-		if (!team.freeToJoin) continue;
-		if (team.memberIds.length >= 4) continue;
-		if (!bestTeam ? true : team.memberIds.length < bestTeam.memberIds.length) {
-			bestTeam = team;
-		}
-	}
+	// ensure user still doesnt have a team
 	const caller = await fetchUser(transaction, joinRandomInfo.caller);
-	// if there's no team available, dm the user with sad face
-	if (bestTeam == null) {
-		(await (await guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
-		removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
-		clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
-		clearObject(joinRandomInfo);
-		await transaction.commit();
-		await (await (await guild.members.fetch(caller.discordUserId)).createDM()).send("30 minutes passed but no free to join teams were available :(")
-		return;
+	let bestTeam = undefined;
+	if (caller.teamId == null) {
+		// loop through all teams and get a free to join team with the smallest team size
+		for (const teamId of (await fetchTeams(transaction)).teamIds ?? []) {
+			const team = await fetchTeam(transaction, teamId);
+			if (!team.freeToJoin) continue;
+			if (team.memberIds.length >= 4) continue;
+			if (!bestTeam ? true : team.memberIds.length < bestTeam.memberIds.length) {
+				bestTeam = team;
+			}
+		}
+		// if there's no team available, dm the user with sad face
+		if (bestTeam == null) {
+			(await (await guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+			removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
+			clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
+			clearObject(joinRandomInfo);
+			await transaction.commit();
+			await (await (await guild.members.fetch(caller.discordUserId)).createDM()).send("30 minutes passed but no free to join teams were available :(")
+			return;
+		}
+		// join the team and clear info
+		await joinTeam(guild, transaction, bestTeam, caller);
 	}
-	// join the team and clear info
-	await joinTeam(guild, transaction, bestTeam, caller);
 	const channel = await guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel;
 	(await channel.messages.fetch(joinRandomInfo.discordMessageId)).delete();
 	removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
 	clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
 	clearObject(joinRandomInfo);
 	await transaction.commit();
-	await channel.send(`${await guild.members.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
+	if (bestTeam != null) {
+		await channel.send(`${await guild.members.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
+	}
 }
 
 client.once("ready", async () => {
@@ -516,7 +522,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// fail if team with name doesnt exists
 		const team = await findTeam(transaction, { name: teamName });
 		if (team == null) {
-			await interaction.editReply(`Team called ${teamName} doesn't exists`);
+			await interaction.editReply(`Team called ${teamName} doesn't exist`);
 			return;
 		}
 		// create caller
@@ -736,20 +742,23 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			const teamName = `${Math.floor(Math.random() * 2000)}`
 			if (await findTeam(transaction, { name: teamName }) != null)
 				throw Error("lol just try again pls: team name collided");
-			// make a team with them and have it be open to others
 			const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
-			const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
-			await joinTeam(interaction.guild, transaction, team, otherUser);
-			await joinTeam(interaction.guild, transaction, team, callerUser);
-			// remove previous message and clear info
-			(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
-			removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
-			clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
-			clearObject(joinRandomInfo);
-			// complete command
-			await transaction.commit();
-			await interaction.editReply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
-			return;
+			// fail if the other dude made a team already
+			if (otherUser.teamId == null) {
+				// make a team with them and have it be open to others
+				const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
+				await joinTeam(interaction.guild, transaction, team, otherUser);
+				await joinTeam(interaction.guild, transaction, team, callerUser);
+				// remove previous message and clear info
+				(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
+				clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
+				clearObject(joinRandomInfo);
+				// complete command
+				await transaction.commit();
+				await interaction.editReply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+				return;
+			}
 		}
 		// create delayed interaction info
 		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
@@ -840,35 +849,61 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					await message.reply(`Caller wasn't invited`);
 					return;
 				}
-				removeFromArray(info.waiting, callerUser.id);
-				info.accepted.push(callerUser.id);
-				if (info.accepted.length >= 1) {
+				// fail if caller is already in a team
+				if (callerUser.teamId != null) {
+					await transaction.commit();
+					await message.reply(`Caller is on a team`);
+					return;
+				}
+				if (info.accepted.length === 1) {
 					// fail if another team with same name exists
 					if (await findTeam(transaction, { name: info.futureTeamName }) != null) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
+						await transaction.commit();
 						await message.reply(`Team called ${info.futureTeamName} now exists`);
 						return;
 					}
+					removeFromArray(info.waiting, callerUser.id);
+					info.accepted.push(callerUser.id);
 					// create team
 					const team = await createTeam(interaction.guild, transaction, {
 						id: info.futureTeamId,
 						name: info.futureTeamName,
 					});
-					for (const userId of [info.caller, ...info.accepted, ...info.declined, ...info.waiting]) {
+					for (const userId of [info.caller, ...info.accepted]) {
 						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, userId));
 					}
-					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
-					clearObject(info);
 					const teamMates = [];
 					for (const memberId of team.memberIds) {
 						teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
 					};
+					if (info.waiting.length === 0) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
+					}
 					await transaction.commit();
 					await message.reply(`Team ${team.name} with members ${teamMates.map(member => member.toString()).join(", ")} is created`);
 					return;
+				} else {
+					// fail if team is full
+					const team = await fetchTeam(transaction, info.futureTeamId)
+					if (team.memberIds.length >= 4) {
+						await transaction.commit();
+						await message.reply(`Team ${info.futureTeamName} is now full`);
+						return;
+					}
+					removeFromArray(info.waiting, callerUser.id);
+					info.accepted.push(callerUser.id);
+					await joinTeam(interaction.guild, transaction, team, callerUser);
+					if (info.waiting.length === 0) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
+					}
+					await transaction.commit();
+					await message.reply(`Accepted invitation to ${team.name}`);
+					return;
 				}
-				await transaction.commit();
-				await message.reply(`Accepted invitation to ${info.futureTeamName}`);
-				return;
 			}
 			if (interaction.customId === "decline") {
 				if (info.caller === callerUser.id) {
@@ -907,7 +942,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
-				await message.reply(`Team ${teamName} cancelled`);
+				await message.reply(`Invitations to team ${teamName} cancelled`);
 				return;
 			}
 		}
@@ -935,9 +970,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
 				if (info.approved.length > numMembers / 2) {
 					// fail if team is full
-					if (info.memberIds.length >= 4) {
+					if (team.memberIds.length >= 4) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
 						await transaction.commit();
 						await message.reply(`${callerDiscordUser}'s requested team is now full`);
+						return;
+					}
+					// fail if caller is already in a team
+					if (callerUser.teamId != null) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
+						await transaction.commit();
+						await message.reply(`${callerDiscordUser} now has a team`);
 						return;
 					}
 					await joinTeam(interaction.guild, transaction, team, callerUser);
@@ -965,7 +1010,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
 				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
-				if (info.rejected.length > numMembers / 2) {
+				if (info.rejected.length >= numMembers / 2) {
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
@@ -1016,6 +1061,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					const oldTeamName = team.name;
 					// fail if another team with same name exists
 					if (await findTeam(transaction, { name: info.newTeamName }) != null) {
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
+						clearObject(info);
 						await transaction.commit();
 						await message.reply(`Team called ${info.newTeamName} now exists`);
 						return;
@@ -1047,7 +1094,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
-				if (info.rejected.length > numMembers / 2) {
+				if (info.rejected.length >= numMembers / 2) {
 					const teamName = info.newTeamName;
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
