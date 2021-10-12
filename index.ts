@@ -142,6 +142,8 @@ function createTransaction(resources: Resources) {
 	return new Transaction(resources);
 }
 
+let running = false;
+
 // fetchable type
 type Fetchable = Transaction | Resources;
 
@@ -805,6 +807,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		customId: interaction.customId,
 	});
 	try {
+		if (running) return;
+		running = true;
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
@@ -1111,6 +1115,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		try {
 			await interaction.followUp(`Oops, an internal error occurred: ${e}`);
 		} catch (e) {}
+	} finally {
+		running = false;
 	}
 });
 
@@ -1123,6 +1129,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 	await interaction.deferReply();
 
 	try {
+		if (running) {
+			await interaction.editReply("please try again later");
+			return;
+		}
+		running = true;
+
 		const metadata = {
 			timestamp: Date.now(),
 			userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
@@ -1634,6 +1646,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		try {
 			await interaction.editReply(`Oops, an internal error occurred: ${e}`);
 		} catch (e) {}
+	} finally {
+		running = false;
 	}
 });
 
