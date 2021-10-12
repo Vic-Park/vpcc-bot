@@ -100,47 +100,9 @@ const commands = [
 				.setRequired(false))),
 	new SlashCommandBuilder()
 		.setName("profile")
-		.setDescription("Shows a summary of your profile")
-		.addStringOption(option => option
-			.setName("type")
-			.setDescription("The type of summary to show")
-			.setRequired(false)
-			.addChoice("user", "user")
-			.addChoice("medals", "medals")
-			.addChoice("points", "points")
-			.addChoice("team", "team")),
-	new SlashCommandBuilder()
-		.setName("profile2")
 		.setDescription("Shows a summary of your profile"),
 	new SlashCommandBuilder()
 		.setName("team")
-		.setDescription("Manage teams")
-		.addSubcommand(subcommand => subcommand
-			.setName("create")
-			.setDescription("Creates and joins a new team")
-			.addStringOption(option => option
-				.setName("name")
-				.setDescription("Name of team")
-				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
-			.setName("join")
-			.setDescription("Joins a team")
-			.addStringOption(option => option
-				.setName("name")
-				.setDescription("Name of team")
-				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
-			.setName("leave")
-			.setDescription("Leaves your team and destroys it if empty"))
-		.addSubcommand(subcommand => subcommand
-			.setName("rename")
-			.setDescription("Renames your team")
-			.addStringOption(option => option
-				.setName("name")
-				.setDescription("Name of team")
-				.setRequired(true))),
-	new SlashCommandBuilder()
-		.setName("team2")
 		.setDescription("Manage teams")
 		.addSubcommand(subcommand => subcommand
 			.setName("create")

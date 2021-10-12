@@ -416,7 +416,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		if (member3 != null)
 			teamMates.push(await interaction.guild.members.fetch(member3));
 		// log command and setup transaction
-		console.log([ "team2", "create", teamName, teamMates, metadata ]);
+		console.log([ "team", "create", teamName, teamMates, metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// fail if another team with same name exists
@@ -508,7 +508,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		assert(interaction.channel);
 		const teamName = interaction.options.getString("team-name", true);
 		// log command and setup transaction
-		console.log([ "team2", "join", teamName, metadata ]);
+		console.log([ "team", "join", teamName, metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// fail if team with name doesnt exists
@@ -611,7 +611,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		assert(interaction.channel);
 		const newTeamName = interaction.options.getString("new-team-name", true);
 		// log command and setup transaction
-		console.log([ "team2", "rename", newTeamName, metadata ]);
+		console.log([ "team", "rename", newTeamName, metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// create caller
@@ -680,7 +680,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 	},
 	async leave(interaction: { user: any; guild: any; id: any; editReply: (arg0: string) => any; }, metadata: any) {
 		// log command and setup transaction
-		console.log([ "team2", "leave", metadata ]);
+		console.log([ "team", "leave", metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// create caller
@@ -708,7 +708,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		assert(interaction.guild);
 		assert(interaction.channel);
 		// log command and setup transaction
-		console.log([ "team2", "join-random", metadata ]);
+		console.log([ "team", "join-random", metadata ]);
 		const transaction = createTransaction(resources);
 		const caller = interaction.user;
 		// create caller
@@ -1547,188 +1547,49 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		}
 
 		if (interaction.commandName === "profile") {
-			const type = interaction.options.getString("type") || "user";
-			if (type === "user") {
-				console.log([ "profile", "user", metadata ]);
-				// find user and create if doesnt exist
-				let user = await findUser(resources, { discordUserId: interaction.user.id });
-				if (!user) {
-					const transaction = createTransaction(resources);
-					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
-					await transaction.commit();
+			console.log([ "profile", metadata ]);
+			// find user and create if doesnt exist
+			let user = await findUser(resources, { discordUserId: interaction.user.id });
+			if (!user) {
+				const transaction = createTransaction(resources);
+				user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
+				await transaction.commit();
+			}
+			// get current team / points / medals
+			// get team
+			const teamId = user.teamId;
+			const teamName = teamId && (await fetchTeam(resources, teamId)).name;
+			/*
+			// get points this month
+			const pointsThisMonth = [...user.pointEvents || []].reduce((points, { type, deltaPoints }) => {
+				if (type == "add") {
+					return points + deltaPoints;
 				}
-				// get current team / points / medals
-				// get team
-				const teamId = user.teamId;
-				const teamName = teamId && (await fetchTeam(resources, teamId)).name;
-				/*
-				// get points this month
-				const pointsThisMonth = [...user.pointEvents || []].reduce((points, { type, deltaPoints }) => {
-					if (type == "add") {
-						return points + deltaPoints;
-					}
-					if (type == "clear") {
-						return 0;
-					}
-				}, 0);
-				// get number of medals
-				const numMedals = [...user.medalEvents || []].reduce((numMedals, { type }) => {
-					if (type == "add") {
-						return numMedals + 1;
-					}
-				}, 0);
-				*/
-				const pointsThisMonth = 0; const numMedals = 0;
-				// build response
-				const parts = [];
-				parts.push(`Summary for ${metadata.userDisplayName}`);
-				if (teamId)
-					parts.push(`- Team: ${teamName}`);
-				parts.push(`- Points this month: ${pointsThisMonth}`);
-				parts.push(`- Medals: ${numMedals}`);
-				// send response
-				await interaction.editReply({ content: parts.join("\n"), allowedMentions: { parse: [] }});
-				return;
-			}
-			if (type === "medals") {
-				console.log([ "profile", "medals", metadata ]);
-				await interaction.editReply(`haha lol ${type}`);
-				return;
-			}
-			if (type == "points") {
-				console.log([ "profile", "points", metadata ]);
-				await interaction.editReply(`haha lol ${type}`);
-				return;
-			}
-			if (type == "team") {
-				console.log([ "profile", "team", metadata ]);
-				await interaction.editReply(`haha lol ${type}`);
-				return;
-			}
+				if (type == "clear") {
+					return 0;
+				}
+			}, 0);
+			// get number of medals
+			const numMedals = [...user.medalEvents || []].reduce((numMedals, { type }) => {
+				if (type == "add") {
+					return numMedals + 1;
+				}
+			}, 0);
+			*/
+			const pointsThisMonth = 0; const numMedals = 0;
+			// build response
+			const parts = [];
+			parts.push(`Summary for ${metadata.userDisplayName}`);
+			if (teamId)
+				parts.push(`- Team: ${teamName}`);
+			parts.push(`- Points this month: ${pointsThisMonth}`);
+			parts.push(`- Medals: ${numMedals}`);
+			// send response
+			await interaction.editReply({ content: parts.join("\n"), allowedMentions: { parse: [] }});
+			return;
 		}
 
 		if (interaction.commandName === "team") {
-			const subcommandName = interaction.options.getSubcommand(true);
-			if (subcommandName === "create") {
-				const name = interaction.options.getString("name", true);
-				console.log([ "team", "create", name, metadata ]);
-				const transaction = createTransaction(resources);
-				// fail if team exists
-				if (await findTeam(transaction, { name }) != null) {
-					await interaction.editReply(`Team called ${name} already exists`);
-					return;
-				}
-				// fail if user exists and has a previous team
-				let user = await findUser(transaction, { discordUserId: interaction.user.id });
-				if (user != null) {
-					if (user.teamId != null) {
-						await interaction.editReply(`You are still in a team`);
-						return;
-					}
-				}
-				// create user if doesnt exist
-				if (user == null) {
-					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
-				}
-				// create team
-				const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name });
-				// join team
-				await joinTeam(interaction.guild, transaction, team, user);
-				// reply to interaction
-				await transaction.commit();
-				await interaction.editReply(`Created and joined new team called ${name}`);
-				return;
-			}
-			if (subcommandName === "join") {
-				const name = interaction.options.getString("name", true);
-				console.log([ "team", "join", name, metadata ]);
-				// create transaction
-				const transaction = createTransaction(resources);
-				// find user
-				let user = await findUser(transaction, { discordUserId: interaction.user.id });
-				// fail if user exists and has a previous team
-				if (user != null) {
-					if (user.teamId != null) {
-						await interaction.editReply(`You are still in a team`);
-						return;
-					}
-				}
-				// create user if necessary
-				if (user == null) {
-					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
-				}
-				// fail if team doesnt exist
-				const team = await findTeam(transaction, { name });
-				if (team == null) {
-					await interaction.editReply(`Team called ${name} doesn't exist`);
-					return;
-				}
-				// join team
-				await joinTeam(interaction.guild, transaction, team, user);
-				// reply to interaction
-				await transaction.commit();
-				await interaction.editReply(`Joined team called ${name}`);
-				return;
-			}
-			if (subcommandName === "leave") {
-				console.log([ "team", "leave", metadata ]);
-				const transaction = createTransaction(resources);
-				// fail if user doesnt exist
-				const user = await findUser(transaction, { discordUserId: interaction.user.id });
-				if (user == null) {
-					await interaction.editReply(`You are not in a team`);
-					return;
-				}
-				// fail if doesnt have a previous team
-				if (user.teamId == null) {
-					await interaction.editReply(`You are not in a team`);
-					return;
-				}
-				// get team name
-				const team = await fetchTeam(transaction, user.teamId);
-				const teamName = team.name;
-				// leave previous team
-				await leaveTeam(interaction.guild, transaction, user);
-				// remove team if empty
-				if ((team.memberIds ?? []).length === 0) {
-					await destroyTeam(interaction.guild, transaction, team);
-				}
-				// reply to interaction
-				await transaction.commit();
-				await interaction.editReply(`Left team called ${teamName}`);
-				return;
-			}
-			if (subcommandName === "rename") {
-				const name = interaction.options.getString("name", true);
-				console.log([ "team", "rename", name, metadata ]);
-				const transaction = createTransaction(resources);
-				// fail if user doesnt exist
-				const user = await findUser(transaction, { discordUserId: interaction.user.id });
-				if (user == null) {
-					await interaction.editReply(`You are not in a team`);
-					return;
-				}
-				// fail if team with same name exists
-				if (await findTeam(transaction, { name }) != null) {
-					await interaction.editReply(`Another team called ${name} exists`);
-					return;
-				}
-				// fail if doesnt have a previous team
-				if (user.teamId == null) {
-					await interaction.editReply(`You are not in a team`);
-					return;
-				}
-				// rename previous team
-				const team = await fetchTeam(transaction, user.teamId);
-				await renameTeam(interaction.guild, transaction, team, name);
-				// reply to interaction
-				await transaction.commit();
-				await interaction.editReply(`Renamed team to ${name}`);
-				return;
-			}
-		}
-
-		if (interaction.commandName === "team2") {
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName in teamFunctions) {
 				await teamFunctions[subcommandName](interaction, metadata);
