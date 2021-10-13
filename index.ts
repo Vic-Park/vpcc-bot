@@ -484,6 +484,44 @@ function createTeamJoinRequestOptions(
 	};
 }
 
+function createTeamRenameRequestOptions(
+	teamName: string,
+	newTeamName: string,
+	caller: GuildMember,
+	waiting: GuildMember[],
+	approved: GuildMember[],
+	rejected: GuildMember[],
+	disabled: boolean = false,
+): MessageOptions {
+	return {
+		content: (
+			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.ceil((waiting.length + approved.length + rejected.length) / 2)} needed for approval)\n`
+			+ `Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
+			+ `Approved: ${approved ? approved.join(", ") : "*empty*"}\n`
+			+ `Denied: ${rejected ? rejected.join(", ") : "*empty*"}\n`
+		),
+		components: [
+			new MessageActionRow().addComponents(
+				new MessageButton()
+					.setCustomId("approve")
+					.setLabel("Approve")
+					.setStyle("SUCCESS")
+					.setDisabled(disabled),
+				new MessageButton()
+					.setCustomId("reject")
+					.setLabel("Reject")
+					.setStyle("DANGER")
+					.setDisabled(disabled),
+				new MessageButton()
+					.setCustomId("cancel")
+					.setLabel("Cancel")
+					.setStyle("SECONDARY")
+					.setDisabled(disabled),
+			),
+		],
+	};
+}
+
 async function errorInteraction(interaction: CommandInteraction, content: string, followUp: boolean = false) {
 	console.log(`Error: ${content}`);
 	if (followUp) {
@@ -663,14 +701,16 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		await reply.edit(createTeamJoinRequestOptions(teamName, caller, teamMates, [], []));
 	},
 	async rename(interaction: CommandInteraction, metadata: any) {
-		await interaction.deferReply();
+		async function error(content: string, followUp: boolean = false) {
+			return await errorInteraction(interaction, content, followUp);
+		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const newTeamName = interaction.options.getString("new-team-name", true);
 		// log command and setup transaction
 		console.log([ "team", "rename", newTeamName, metadata ]);
 		const transaction = createTransaction(resources);
-		const caller = interaction.user;
+		const caller = await interaction.guild.members.fetch(interaction.user.id);
 		// create caller
 		let callerUser = await findUser(transaction, { discordUserId: caller.id });
 		if (callerUser == null) {
@@ -678,32 +718,32 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}
 		// fail if caller isn't in a team
 		if (callerUser.teamId == null) {
-			await interaction.editReply(`You are not in a team`);
-			return;
+			return await error(`You are not in a team`);
 		}
 		// fail if name is longer than 32 characters
 		if (!(newTeamName.length <= 32)) {
-			await interaction.editReply(`Team name ${newTeamName} too long`);
-			return;
+			return await error(`Team name ${newTeamName} too long`);
 		}
 		// fail if another team with same name exists
 		if (await findTeam(transaction, { name: newTeamName }) != null) {
-			await interaction.editReply(`Team called ${newTeamName} already exists`);
-			return;
+			return await error(`Team called ${newTeamName} already exists`);
 		}
 		const team = await fetchTeam(transaction, callerUser.teamId);
 		const teamMates = [];
 		for (const memberId of team.memberIds) {
 			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
 		};
+		// complete command and commit transaction
+		await interaction.reply({ content: `Creating rename request...`, ephemeral: true });
+		await transaction.commit();
+		// create message that has buttons for confirming stuff
+		const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], [], true));
 		// create delayed interaction info
-		await interaction.editReply(".");
-		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
-		// const message = await interaction.fetchReply();
-		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
-		const info = await transaction.fetch(`/interaction/${message.id}`);
+		const transaction2 = createTransaction(resources);
+		((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
+		const info = await transaction2.fetch(`/interaction/${reply.id}`);
 		Object.assign(info, {
-			id: message.id,
+			id: reply.id,
 			type: "teamRename",
 			teamId: team.id,
 			waiting: removeFromArray([...team.memberIds], callerUser.id),
@@ -712,28 +752,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			caller: callerUser.id,
 			newTeamName,
 		});
-		// complete command and commit transaction
-		await transaction.commit();
-		// create message that has buttons for confirming stuff
-		await message.edit({
-			content: `Awaiting approval from team members ${teamMates.filter(member => member.id !== caller.id).map(member => member.toString()).join(", ")} to approve renaming team to ${newTeamName}`,
-			components: [
-				new MessageActionRow().addComponents(
-					new MessageButton()
-						.setCustomId("approve")
-						.setLabel("Approve")
-						.setStyle("SUCCESS"),
-					new MessageButton()
-						.setCustomId("reject")
-						.setLabel("Reject")
-						.setStyle("DANGER"),
-					new MessageButton()
-						.setCustomId("cancel")
-						.setLabel("Cancel")
-						.setStyle("SECONDARY"),
-				),
-			],
-		});
+		await transaction2.commit();
+		// enable the buttons
+		await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], []));
 	},
 	async leave(interaction: CommandInteraction, metadata: any) {
 		await interaction.deferReply();
@@ -1131,6 +1152,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		if (info.type === "teamRename") {
 			const team = await fetchTeam(transaction, info.teamId);
 			const numMembers = info.waiting.length + info.approved.length + info.rejected.length;
+			async function createTeamRenameRequestOptionsFromInfo(info: Record<string, any>, disabled: boolean = false): Promise<MessageOptions> {
+				return createTeamRenameRequestOptions(
+					team.name,
+					info.newTeamName,
+					await interaction.guild!.members.fetch((await fetchUser(transaction, info.caller)).discordUserId),
+					await Promise.all(info.waiting.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					await Promise.all(info.approved.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					await Promise.all(info.rejected.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					disabled,
+				)
+			}
 			// ensure caller
 			let callerUser = await findUser(transaction, { discordUserId: caller.id });
 			if (callerUser == null) {
@@ -1152,21 +1184,26 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					const oldTeamName = team.name;
 					// fail if another team with same name exists
 					if (await findTeam(transaction, { name: info.newTeamName }) != null) {
+						const options = await createTeamRenameRequestOptionsFromInfo(info, true);
 						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 						clearObject(info);
 						await transaction.commit();
-						await message.reply(`Team called ${info.newTeamName} now exists`);
+						await message.edit(options);
+						await message.reply(`Team called ${info.newTeamName} now exists :(`);
 						return;
 					}
+					const options = await createTeamRenameRequestOptionsFromInfo(info, true);
 					await renameTeam(interaction.guild, transaction, team, info.newTeamName);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
+					await message.edit(options);
 					await message.reply(`Renamed team ${oldTeamName} to ${team.name}`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Approved rename request from ${team.name} to ${info.newTeamName}`);
+				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
+				await interaction.followUp({ content: `Approved rename request from ${team.name} to ${info.newTeamName}`, ephemeral: true });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -1183,14 +1220,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				info.rejected.push(callerUser.id);
 				if (info.rejected.length >= numMembers / 2) {
 					const teamName = info.newTeamName;
+					const options = await createTeamRenameRequestOptionsFromInfo(info, true);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
+					await message.edit(options);
 					await message.reply(`Request to rename team ${team.name} to ${teamName} is rejected`);
 					return;
 				}
 				await transaction.commit();
-				await message.reply(`Rejected rename request from ${team.name} to ${info.newTeamName}`);
+				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
+				await interaction.followUp({ content: `Rejected rename request from ${team.name} to ${info.newTeamName}`, ephemeral: true });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -1198,9 +1238,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					return await error(`You aren't rename requester`);
 				}
 				const teamName = info.newTeamName;
+				const options = await createTeamRenameRequestOptionsFromInfo(info, true);
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
+				await message.edit(options);
 				await message.reply(`Request to rename team ${team.name} to ${teamName} is cancelled`);
 				return;
 			}
