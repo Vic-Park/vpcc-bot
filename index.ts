@@ -457,7 +457,7 @@ function createTeamJoinRequestOptions(
 ): MessageOptions {
 	return {
 		content: (
-			`${caller} wants to join Team ${teamName} (${Math.ceil((waiting.length + approved.length + rejected.length) / 2)} needed for approval)\n`
+			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)\n`
 			+ `Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
 			+ `Approved: ${approved ? approved.join(", ") : "*empty*"}\n`
 			+ `Denied: ${rejected ? rejected.join(", ") : "*empty*"}\n`
@@ -495,7 +495,7 @@ function createTeamRenameRequestOptions(
 ): MessageOptions {
 	return {
 		content: (
-			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.ceil((waiting.length + approved.length + rejected.length) / 2)} needed for approval)\n`
+			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)\n`
 			+ `Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
 			+ `Approved: ${approved ? approved.join(", ") : "*empty*"}\n`
 			+ `Denied: ${rejected ? rejected.join(", ") : "*empty*"}\n`
