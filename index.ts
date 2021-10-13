@@ -397,7 +397,7 @@ async function checkJoinRandom() {
 	clearObject(joinRandomInfo);
 	await transaction.commit();
 	if (bestTeam != null) {
-		await channel.send(`${await guild.members.fetch(caller.discordUserId)} joined team ${bestTeam.name}`);
+		await (await (await guild.members.fetch(caller.discordUserId)).createDM()).send(`30 minutes passed so I've put you in team ${bestTeam.name}`);
 	}
 }
 
@@ -784,7 +784,9 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		].join(" "));
 	},
 	"join-random": async (interaction: CommandInteraction, metadata: any) => {
-		await interaction.deferReply();
+		async function error(content: string, followUp: boolean = false) {
+			return await errorInteraction(interaction, content, followUp);
+		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		// log command and setup transaction
@@ -798,8 +800,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}
 		// fail if caller is in a team
 		if (callerUser.teamId != null) {
-			await interaction.editReply(`You are already in a team`);
-			return;
+			return await error(`You are already in a team`);
 		}
 		// get joinRandom info
 		const joinRandomInfo = await transaction.fetch(`/joinRandom`);
@@ -807,8 +808,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		if ("start" in joinRandomInfo) {
 			// fail if its the same dude lol
 			if (joinRandomInfo.caller === callerUser.id) {
-				await interaction.editReply(`You are already waiting to join a random team`);
-				return;
+				return await error(`You are already waiting to join a random team`);
 			}
 			// generate a random team name that doesn't exist
 			const teamName = `${Math.floor(Math.random() * 2000)}`
@@ -828,12 +828,22 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await interaction.editReply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+				await interaction.reply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
 				return;
 			}
 		}
 		// create delayed interaction info
-		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
+		const message = await interaction.channel.send({
+			content: `${caller} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
+			components: [
+				new MessageActionRow().addComponents(
+					new MessageButton()
+						.setCustomId("cancel")
+						.setLabel("Cancel")
+						.setStyle("SECONDARY"),
+				),
+			],
+		});
 		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 		const info = await transaction.fetch(`/interaction/${message.id}`);
 		Object.assign(info, {
@@ -851,18 +861,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		});
 		// complete command and commit transaction
 		await transaction.commit();
-		await interaction.editReply({
-			content: `${caller} is looking for a team! DM them if you want to team up!`,
-			components: [
-				new MessageActionRow().addComponents(
-					new MessageButton()
-						.setCustomId("cancel")
-						.setLabel("Cancel")
-						.setStyle("SECONDARY"),
-				),
-			],
-		});
-		await interaction.followUp({ content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D", ephemeral: true});
+		await interaction.reply({ ephemeral: true, content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D (Make sure your DMs are open so I can contact you after 30 mins.)" });
 	},
 };
 
@@ -1255,17 +1254,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					return await error(`You aren't join random requester`);
+					return await error(`You aren't the original requester`);
 				}
 				// remove interaction info and joinRandom info
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-				(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await message.channel.send(`Cancelled join random request`);
+				await interaction.reply({ content: `Cancelled join random request`, ephemeral: true });
+				await (await interaction.channel.messages.fetch(interaction.message.id)).delete();
 				return;
 			}
 		}
