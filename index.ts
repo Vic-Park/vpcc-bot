@@ -1807,27 +1807,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 		}
 
-		if (interaction.commandName === "leaderboard") {
-			const type = interaction.options.getString("type") || "normal";
-			await interaction.reply("haha lol leaderboard");
-			return;
-		}
-
-		if (interaction.commandName === "points") {
-			const subcommandName = interaction.options.getSubcommand(true);
-			if (subcommandName === "give-team") {
-				const name = interaction.options.getString("name", true);
-				const points = interaction.options.getInteger("points", true);
-				await interaction.reply(`haha lol points give-team ${name} ${points}`);
-				return;
-			}
-			if (subcommandName === "give-voice") {
-				const channel = interaction.options.getString("channel", true);
-				const points = interaction.options.getInteger("points", true);
-				await interaction.reply(`haha lol points give-voice ${channel} ${points}`);
-				return;
-			}
-		}
+		if (interaction.commandName === "leaderboard") { }
 
 		// fallback when command aint implemented
 		console.log(`not implemented: ${interaction.commandName}`);
