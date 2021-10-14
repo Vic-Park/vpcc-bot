@@ -369,7 +369,7 @@ async function destroyTeam(guild: Guild, transaction: Fetchable, team: TeamData)
 	removeFromArray((teams.teamIds ??= []), team.id);
 	clearObject(team);
 }
-    
+
 async function checkJoinRandom() {
 	const guild = await client.guilds.fetch(process.env.GUILD_ID!);
 	console.log("running check on joinRandom");
