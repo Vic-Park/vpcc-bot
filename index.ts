@@ -1174,7 +1174,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "rename-team") {
-				await interaction.deferReply();
 				const teamName = interaction.options.getString("team-name", true);
 				const newTeamName = interaction.options.getString("new-team-name", true);
 				console.log([ "admin", "rename-team", teamName, newTeamName, metadata ]);
@@ -1182,14 +1181,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if team doesnt exist
 				const team = await findTeam(transaction, { name: teamName });
 				if (team == null) {
-					await interaction.editReply(`Team does not exist`);
-					return;
+					throw new InteractionError(`Team does not exist`);
 				}
+				await interaction.reply({ content: `Renaming team...`, ephemeral: true });
 				// rename team
 				await renameTeam(interaction.guild, transaction, team, newTeamName);
 				// reply to interaction
 				await transaction.commit();
-				await interaction.editReply(`Renamed ${teamName} to ${newTeamName}`);
+				await interaction.channel.send(`Renamed ${teamName} to ${newTeamName}`);
 				return;
 			}
 			if (subcommandName === "move-to-breakout-rooms") {
@@ -1221,21 +1220,18 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "register-workshop") {
-				await interaction.deferReply();
 				const workshopCode = interaction.options.getString("workshop-code", true);
 				const workshopName = interaction.options.getString("workshop-name", true);
 				console.log([ "admin", "register-workshop", workshopCode, workshopName, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if workshop code has caps or spaces
 				if (!/^[-a-z0-9]+$/g.test(workshopCode)) {
-					await interaction.editReply(`Workshop code can only have lowercase letters and dashes`);
-					return;
+					throw new InteractionError(`Workshop code can only have lowercase letters and dashes`);
 				}
 				// fail if workshop with code exists
 				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
 				if (workshop.id != null) {
-					await interaction.editReply(`Workshop with same code exists`);
-					return;
+					throw new InteractionError(`Workshop with same code exists`);
 				}
 				// fail if no workshops category exists
 				const workshopsCategory = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
@@ -1243,8 +1239,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					&& channel.name.toLowerCase() === "workshops"
 				)) as CategoryChannel | undefined;
 				if (workshopsCategory == null) {
-					await interaction.editReply(`No workshops category exists`);
-					return;
+					throw new InteractionError(`No "workshops" category exists`);
 				}
 				// fail if no workshops channel exists
 				const workshopsChannel = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
@@ -1252,16 +1247,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					&& channel.name.toLowerCase() === "workshops"
 				)) as TextChannel | undefined;
 				if (workshopsChannel == null) {
-					await interaction.editReply(`No workshops channel exists`);
-					return;
+					throw new InteractionError(`No "workshops" channel exists`);
 				}
+				await interaction.reply({ content: `Creating workshop...`, ephemeral: true });
 				// create workshop
 				((await transaction.fetch(`/workshops`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
 				workshop.name = workshopName;
 				workshop.hostDiscordUserId = interaction.user.id;
 				// create delayed interaction info
-				const message = await workshopsChannel.send(".");
+				const message = await workshopsChannel.send("...");
 				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
 				const info = await transaction.fetch(`/interaction/${message.id}`);
 				Object.assign(info, {
@@ -1281,9 +1276,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				workshop.discordVoiceChannelId = voiceChannel.id;
 				// reply to interaction
 				await transaction.commit();
-				await interaction.editReply(`Created workshop`);
+				await interaction.followUp({ ephemeral: true, content: `Created workshop` });
 				await message.edit({
-					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button before to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
+					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
