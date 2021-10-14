@@ -962,12 +962,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await caller.roles.add(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
+				await interaction.followUp({ ephemeral: true, content: `Added ${info.workshopId} role to you` });
 				return;
 			}
 			if (interaction.customId === "remove") {
 				await caller.roles.remove(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
+				await interaction.followUp({ ephemeral: true, content: `Removed ${info.workshopId} role from you` });
 				return;
 			}
 		}
