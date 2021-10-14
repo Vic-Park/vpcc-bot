@@ -1116,62 +1116,61 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "delete-team") {
-				await interaction.deferReply();
 				const teamName = interaction.options.getString("team-name", true);
 				console.log([ "admin", "delete-team", teamName, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team doesnt exist
 				const team = await findTeam(transaction, { name: teamName });
 				if (team == null) {
-					await interaction.editReply(`Team does not exist`);
-					return;
+					throw new InteractionError(`Team does not exist`);
 				}
 				const teamMates = [];
 				for (const memberId of team.memberIds) {
-					teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+					teamMates.push(await fetchUser(transaction, memberId));
 				};
 				// confirmation with a list of ppl in the team
-				await interaction.editReply({
-					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(teamMate => teamMate.user.username).join(", ")}?`,
+				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
+				await interaction.reply({
+					ephemeral: true,
+					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(m => `<@${m.discordUserId}>`).join(", ")}?`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
-								.setCustomId("yes")
+								.setCustomId(customIdPrefix + "yes")
 								.setLabel("Confirm")
 								.setStyle("SUCCESS"),
 							new MessageButton()
-								.setCustomId("no")
+								.setCustomId(customIdPrefix + "no")
 								.setLabel("Cancel")
 								.setStyle("DANGER"),
 						),
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-				let nextInteraction;
-				try {
-					nextInteraction = await (await interaction.channel.messages.fetch((await interaction.fetchReply()).id)).awaitMessageComponent({
-						filter: (interaction: { user: { id: any; }; }) => interaction.user.id === caller.id,
-						time: 10_000,
+				const nextInteraction = await new Promise(resolve => {
+					assert(interaction.channel);
+					const collector = interaction.channel.createMessageComponentCollector({
+						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === caller.id,
+						time: 10000,
+						max: 1,
 					});
-				} catch (e) {
-					nextInteraction = undefined;
-				}
+					collector.on("end", collected => resolve(collected.first()));
+				}) as MessageComponentInteraction | undefined;
 				if (nextInteraction == null) {
-					await interaction.followUp({ content: `Confirmation timed out`, components: [] });
-					return;
+					throw new InteractionError(`Confirmation timed out`);
 				}
-				if (nextInteraction.customId === "no") {
-					await interaction.followUp(`Cancelled team destruction`);
-					return;
+				if (nextInteraction.customId.endsWith("no")) {
+					throw new InteractionError(`Cancelled team destruction`);
 				}
+				await interaction.followUp({ content: `Destroying team...`, ephemeral: true });
 				// destroy team
-				for (const memberId of [...team.memberIds]) {
-					await leaveTeam(interaction.guild, transaction, await fetchUser(transaction, memberId));
+				for (const teamMate of teamMates) {
+					await leaveTeam(interaction.guild, transaction, teamMate);
 				}
 				await destroyTeam(interaction.guild, transaction, team);
 				// reply to interaction
 				await transaction.commit();
-				await interaction.followUp(`Destroyed team ${teamName}`);
+				await interaction.channel.send(`Destroyed team ${teamName}`);
 				return;
 			}
 			if (subcommandName === "rename-team") {
