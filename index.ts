@@ -1321,7 +1321,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		try {
 			await interaction.followUp({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
 		} catch (e) {
-			console.log(e);
+			console.log(`Couldn't send error: ${e}`);
 		}
 	} finally {
 		running = false;
@@ -1867,11 +1867,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		console.error(e);
 		try {
 			await interaction.reply({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
-		} catch (e) {
+		} catch (_) {
 			try {
 				await interaction.followUp({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
 			} catch (e) {
-				console.log(e);
+				console.log(`Couldn't send error: ${e}`);
 			}
 		}
 	} finally {
