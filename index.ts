@@ -1,10 +1,10 @@
 // Runs the VPCC-Bot
 
-import NodeCache from "node-cache";
+import _assert from "assert";
+import { CategoryChannel, Client, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, TextChannel, VoiceChannel } from "discord.js";
 import Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
-import { ButtonInteraction, CategoryChannel, Client, CommandInteraction, Guild, GuildChannel, GuildMember, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, TextChannel, VoiceChannel } from "discord.js";
-import _assert from "assert";
+import NodeCache from "node-cache";
 
 require("dotenv").config();
 
