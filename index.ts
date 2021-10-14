@@ -248,6 +248,21 @@ async function createUser(_guild: any, transaction: Fetchable, { id, ...properti
 	return user;
 }
 
+// Adapted from https://developer.mozilla.org/en-US/docs/web/javascript/reference/global_objects/error#custom_error_types
+class InteractionError extends Error {
+	constructor(...params: any[]) {
+		// Pass remaining arguments (including vendor specific ones) to parent constructor
+		super(...params)
+
+		// Maintains proper stack trace for where our error was thrown (only available on V8)
+		if (Error.captureStackTrace) {
+			Error.captureStackTrace(this, InteractionError)
+		}
+
+		this.name = "InteractionError";
+	}
+}
+
 async function createTeam(guild: Guild, transaction: Fetchable, { id, ...properties }: Omit<TeamData, "memberIds" | "discordRoleId" | "discordTextChannelId" | "discordVoiceChannelId">): Promise<TeamData> {
 	const teams = await fetchTeams(transaction);
 	const team = await fetchTeam(transaction, id);
@@ -522,20 +537,8 @@ function createTeamRenameRequestOptions(
 	};
 }
 
-async function errorInteraction(interaction: CommandInteraction, content: string, followUp: boolean = false) {
-	console.log(`Error: ${content}`);
-	if (followUp) {
-		await interaction.followUp({ ephemeral: true, content });
-	} else {
-		await interaction.reply({ ephemeral: true, content });
-	}
-}
-
 const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<void>> = {
 	async create(interaction: CommandInteraction, metadata: any) {
-		async function error(content: string, followUp: boolean = false) {
-			return await errorInteraction(interaction, content, followUp);
-		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const teamName = interaction.options.getString("team-name", true);
@@ -553,19 +556,19 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		const caller = await interaction.guild.members.fetch(interaction.user.id);
 		// fail if another team with same name exists
 		if (await findTeam(transaction, { name: teamName }) != null) {
-			return await error(`Team called ${teamName} already exists`);
+			throw new InteractionError(`Team called ${teamName} already exists`);
 		}
 		// fail if name is longer than 32 characters
 		if (!(teamName.length <= 32)) {
-			return await error(`Team name ${teamName} too long`);
+			throw new InteractionError(`Team name ${teamName} too long`);
 		}
 		// fail if caller was specified
 		if (teamMates.some(member => caller.id === member.id)) {
-			return await error(`Caller was specified again as a team mate`);
+			throw new InteractionError(`Caller was specified again as a team mate`);
 		}
 		// fail if team mates aren't unique
 		if ((new Set(teamMates.map(member => member.id))).size !== teamMates.length) {
-			return await error(`A team mate was repeated in the command`);
+			throw new InteractionError(`A team mate was repeated in the command`);
 		}
 		// create caller and team mates
 		let callerUser = await findUser(transaction, { discordUserId: caller.id });
@@ -579,12 +582,12 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}));
 		// fail if caller is already in a team
 		if (callerUser.teamId != null) {
-			return await error(`You are still in a team`);
+			throw new InteractionError(`You are still in a team`);
 		}
 		// fail if a team mate is already in a team
 		for (const teamMateUser of teamMateUsers) {
 			if (teamMateUser.teamId != null) {
-				return await error(`A team mate is still in a team`);
+				throw new InteractionError(`A team mate is still in a team`);
 			}
 		}
 		// complete command and commit transaction
@@ -611,9 +614,6 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		await reply.edit(createTeamInvitationOptions(teamName, caller, teamMates, [], []));
 	},
 	async join(interaction: CommandInteraction, metadata: any) {
-		async function error(content: string, followUp: boolean = false) {
-			return await errorInteraction(interaction, content, followUp);
-		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const teamName = interaction.options.getString("team-name", true);
@@ -624,7 +624,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		// fail if team with name doesnt exists
 		const team = await findTeam(transaction, { name: teamName });
 		if (team == null) {
-			return await error(`Team called ${teamName} doesn't exist`);
+			throw new InteractionError(`Team called ${teamName} doesn't exist`);
 		}
 		// create caller
 		let callerUser = await findUser(transaction, { discordUserId: caller.id });
@@ -632,7 +632,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 		// fail if caller is already in a team
 		if (callerUser.teamId != null) {
-			return await error(`You are still in a team`);
+			throw new InteractionError(`You are still in a team`);
 		}
 		const teamMates = [];
 		for (const memberId of team.memberIds) {
@@ -676,7 +676,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}
 		// fail if team is full
 		if (team.memberIds.length >= 4) {
-			return await error(`Requested team is full`, true);
+			throw new InteractionError(`Requested team is full`, true);
 		}
 		// complete command and commit transaction
 		await interaction.followUp({ content: `Creating join request...`, ephemeral: true });
@@ -701,9 +701,6 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		await reply.edit(createTeamJoinRequestOptions(teamName, caller, teamMates, [], []));
 	},
 	async rename(interaction: CommandInteraction, metadata: any) {
-		async function error(content: string, followUp: boolean = false) {
-			return await errorInteraction(interaction, content, followUp);
-		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const newTeamName = interaction.options.getString("new-team-name", true);
@@ -718,15 +715,15 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}
 		// fail if caller isn't in a team
 		if (callerUser.teamId == null) {
-			return await error(`You are not in a team`);
+			throw new InteractionError(`You are not in a team`);
 		}
 		// fail if name is longer than 32 characters
 		if (!(newTeamName.length <= 32)) {
-			return await error(`Team name ${newTeamName} too long`);
+			throw new InteractionError(`Team name ${newTeamName} too long`);
 		}
 		// fail if another team with same name exists
 		if (await findTeam(transaction, { name: newTeamName }) != null) {
-			return await error(`Team called ${newTeamName} already exists`);
+			throw new InteractionError(`Team called ${newTeamName} already exists`);
 		}
 		const team = await fetchTeam(transaction, callerUser.teamId);
 		const teamMates = [];
@@ -784,9 +781,6 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		].join(" "));
 	},
 	"join-random": async (interaction: CommandInteraction, metadata: any) => {
-		async function error(content: string, followUp: boolean = false) {
-			return await errorInteraction(interaction, content, followUp);
-		}
 		assert(interaction.guild);
 		assert(interaction.channel);
 		// log command and setup transaction
@@ -800,7 +794,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		}
 		// fail if caller is in a team
 		if (callerUser.teamId != null) {
-			return await error(`You are already in a team`);
+			throw new InteractionError(`You are already in a team`);
 		}
 		// get joinRandom info
 		const joinRandomInfo = await transaction.fetch(`/joinRandom`);
@@ -808,7 +802,7 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 		if ("start" in joinRandomInfo) {
 			// fail if its the same dude lol
 			if (joinRandomInfo.caller === callerUser.id) {
-				return await error(`You are already waiting to join a random team`);
+				throw new InteractionError(`You are already waiting to join a random team`);
 			}
 			// generate a random team name that doesn't exist
 			const teamName = `${Math.floor(Math.random() * 2000)}`
@@ -1864,12 +1858,18 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		await interaction.reply({ ephemeral: true, content: "not implemented yet lol" });
 
 	} catch (e) {
-		console.error(e);
+		let content: string;
+		if (!(e instanceof InteractionError)) {
+			console.error(e);
+			content = `Oops, an internal error occurred: ${e}`;
+		} else {
+			content = e.message;
+		}
 		try {
-			await interaction.reply({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
+			await interaction.reply({ ephemeral: true, content });
 		} catch (_) {
 			try {
-				await interaction.followUp({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
+				await interaction.followUp({ ephemeral: true, content });
 			} catch (e) {
 				console.log(`Couldn't send error: ${e}`);
 			}
