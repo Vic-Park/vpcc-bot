@@ -660,7 +660,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					}
 					await transaction.commit();
 					await message.edit(await createTeamInvitationOptionsFromInfo(info));
-					await interaction.followUp({ content: `Accepted invitation to ${team.name}`, ephemeral: true });
+					await interaction.followUp({ ephemeral: true, content: `Accepted invitation to ${team.name}` });
 					return;
 				}
 			}
@@ -688,7 +688,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamInvitationOptionsFromInfo(info));
-				await interaction.followUp({ content: `Declined invitation to ${info.futureTeamName}`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Declined invitation to ${info.futureTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -766,7 +766,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ content: `Approved request from ${callerDiscordUser.user.username} to ${team.name}`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Approved request from ${callerDiscordUser.user.username} to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -791,7 +791,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ content: `Rejected request from ${callerDiscordUser.user.username} to ${team.name}`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Rejected request from ${callerDiscordUser.user.username} to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -803,7 +803,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(info);
 				await transaction.commit();
 				await message.edit(options);
-				await interaction.followUp({ content: `Request to join ${team.name} was cancelled`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Request to join ${team.name} was cancelled` });
 				return;
 			}
 		}
@@ -861,7 +861,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ content: `Approved rename request from ${team.name} to ${info.newTeamName}`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Approved rename request from ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -888,7 +888,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ content: `Rejected rename request from ${team.name} to ${info.newTeamName}`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Rejected rename request from ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -1157,7 +1157,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (nextInteraction.customId.endsWith("no")) {
 					throw new InteractionError(`Cancelled team destruction`);
 				}
-				await interaction.followUp({ content: `Destroying team...`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Destroying team...` });
 				// destroy team
 				for (const teamMate of teamMates) {
 					await leaveTeam(interaction.guild, transaction, teamMate);
@@ -1178,7 +1178,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (team == null) {
 					throw new InteractionError(`Team does not exist`);
 				}
-				await interaction.reply({ content: `Renaming team...`, ephemeral: true });
+				await interaction.reply({ ephemeral: true, content: `Renaming team...` });
 				// rename team
 				await renameTeam(interaction.guild, transaction, team, newTeamName);
 				// reply to interaction
@@ -1243,7 +1243,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (workshopsChannel == null) {
 					throw new InteractionError(`No "workshops" channel exists`);
 				}
-				await interaction.reply({ content: `Creating workshop...`, ephemeral: true });
+				await interaction.reply({ ephemeral: true, content: `Creating workshop...` });
 				// create workshop
 				((await transaction.fetch(`/workshops`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
@@ -1611,7 +1611,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Requested team is full`);
 				}
 				// complete command and commit transaction
-				await interaction.followUp({ content: `Creating join request...`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Creating join request...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], [], true));
@@ -1663,7 +1663,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					teamMateDiscordUserIds.push((await fetchUser(transaction, memberId)).discordUserId);
 				};
 				// complete command and commit transaction
-				await interaction.reply({ content: `Creating rename request...`, ephemeral: true });
+				await interaction.reply({ ephemeral: true, content: `Creating rename request...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [`<@${callerUser.discordUserId}>`], [], true));
