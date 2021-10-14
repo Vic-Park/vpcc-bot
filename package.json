@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "This is a bot to help us manage the Victoria Park Coding Club (VPCC) Discord server, adding features such as teams and leaderboards to make Coding Club more collaborative and more fun!",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
+    "start": "ts-node index.ts",
+    "refresh": "node refresh.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

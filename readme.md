@@ -8,6 +8,6 @@ Environment variables required: BOT_TOKEN (bot token), CLIENT_ID (client ID), an
 
 Install dependencies by running `npm install`.
 
-Refresh slash commands by running `node refresh.js`.
+Refresh slash commands by running `npm run refresh`.
 
-Run the bot by running `node index.js`.
+Run the bot by running `npm start`.
