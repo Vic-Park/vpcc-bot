@@ -10,8 +10,8 @@ require("dotenv").config();
 
 const client = new Client({ intents: [ Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS ], rejectOnRateLimit: () => true });
 
-client.on("ready", () => {
-	console.log(`Logged in as ${client.user!.tag}`);
+client.on("ready", client => {
+	console.log(`Logged in as ${client.user.tag}`);
 });
 
 function sleep(milliseconds: number) {
