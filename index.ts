@@ -546,6 +546,8 @@ const filter = (reaction, user) => reaction.emoji.name === '👍' && user.id ===
 const reactions = await message.awaitReactions({ filter, max: 1, time: 60_000 });
 */
 
+const ephemeral = true;
+
 // Process button interactions
 client.on("interactionCreate", async (interaction: Interaction) => {
 	if (!interaction.isButton())
@@ -660,7 +662,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					}
 					await transaction.commit();
 					await message.edit(await createTeamInvitationOptionsFromInfo(info));
-					await interaction.followUp({ ephemeral: true, content: `Accepted invitation to ${team.name}` });
+					await interaction.followUp({ ephemeral, content: `Accepted invitation to ${team.name}` });
 					return;
 				}
 			}
@@ -688,7 +690,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamInvitationOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral: true, content: `Declined invitation to ${info.futureTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Declined invitation to ${info.futureTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -766,7 +768,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral: true, content: `Approved request from ${callerDiscordUser.user.username} to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Approved request from ${callerDiscordUser.user.username} to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -791,7 +793,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral: true, content: `Rejected request from ${callerDiscordUser.user.username} to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Rejected request from ${callerDiscordUser.user.username} to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -803,7 +805,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(info);
 				await transaction.commit();
 				await message.edit(options);
-				await interaction.followUp({ ephemeral: true, content: `Request to join ${team.name} was cancelled` });
+				await interaction.followUp({ ephemeral, content: `Request to join ${team.name} was cancelled` });
 				return;
 			}
 		}
@@ -861,7 +863,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral: true, content: `Approved rename request from ${team.name} to ${info.newTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Approved rename request from ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -888,7 +890,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral: true, content: `Rejected rename request from ${team.name} to ${info.newTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Rejected rename request from ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -951,7 +953,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral: true, content: `Cancelled join random request` });
+				await interaction.followUp({ ephemeral, content: `Cancelled join random request` });
 				await (await interaction.channel.messages.fetch(interaction.message.id)).delete();
 				return;
 			}
@@ -962,14 +964,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await caller.roles.add(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral: true, content: `Added ${info.workshopId} role to you` });
+				await interaction.followUp({ ephemeral, content: `Added ${info.workshopId} role to you` });
 				return;
 			}
 			if (interaction.customId === "remove") {
 				await caller.roles.remove(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral: true, content: `Removed ${info.workshopId} role from you` });
+				await interaction.followUp({ ephemeral, content: `Removed ${info.workshopId} role from you` });
 				return;
 			}
 		}
@@ -982,7 +984,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			content = e.message;
 		}
 		try {
-			await interaction.followUp({ ephemeral: true, content });
+			await interaction.followUp({ ephemeral, content });
 		} catch (_) {
 			console.log(`Couldn't send error: ${e}`);
 		}
@@ -1025,7 +1027,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
 					throw new InteractionError(`You are not a bot maintainer`);
 				}
-				await interaction.reply({ ephemeral: true, content: "*getting*" });
+				await interaction.reply({ ephemeral, content: "*getting*" });
 				const key = interaction.options.getString("key", true);
 				console.log([ "admin", "get", key, metadata ]);
 				const [resource, ...properties] = key.split(".");
@@ -1042,14 +1044,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					else
 						out = "`" + stringified + "`";
 				}
-				await interaction.followUp({ ephemeral: true, content: out });
+				await interaction.followUp({ ephemeral, content: out });
 				return;
 			}
 			if (subcommandName === "set") {
 				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
 					throw new InteractionError(`You are not a bot maintainer`);
 				}
-				await interaction.reply({ ephemeral: true, content: "*updating*" });
+				await interaction.reply({ ephemeral, content: "*updating*" });
 				const key = interaction.options.getString("key", true);
 				const value = interaction.options.getString("value", true);
 				console.log([ "admin", "set", key, value, metadata ]);
@@ -1070,13 +1072,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					result[last] = eval(`(${value})`);
 				}
 				await transaction.commit();
-				await interaction.followUp({ ephemeral: true, content: "*updated*" });
+				await interaction.followUp({ ephemeral, content: "*updated*" });
 				return;
 			}
 			if (subcommandName === "invalidate") {
 				console.log([ "admin", "invalidate", metadata ]);
 				await resources.invalidate();
-				await interaction.reply({ ephemeral: true, content: "*invalidated*" });
+				await interaction.reply({ ephemeral, content: "*invalidated*" });
 				return;
 			}
 			if (subcommandName === "remove-from-team") {
@@ -1098,7 +1100,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (team.name !== teamName) {
 					throw new InteractionError(`User is in team called ${team.name}, not ${teamName}`);
 				}
-				await interaction.reply({ ephemeral: true, content: "Removing from team..." });
+				await interaction.reply({ ephemeral, content: "Removing from team..." });
 				// leave previous team
 				await leaveTeam(interaction.guild, transaction, user);
 				// remove team if empty
@@ -1126,7 +1128,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// confirmation with a list of ppl in the team
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
-					ephemeral: true,
+					ephemeral,
 					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(m => `<@${m.discordUserId}>`).join(", ")}?`,
 					components: [
 						new MessageActionRow().addComponents(
@@ -1157,7 +1159,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (nextInteraction.customId.endsWith("no")) {
 					throw new InteractionError(`Cancelled team destruction`);
 				}
-				await interaction.followUp({ ephemeral: true, content: `Destroying team...` });
+				await interaction.followUp({ ephemeral, content: `Destroying team...` });
 				// destroy team
 				for (const teamMate of teamMates) {
 					await leaveTeam(interaction.guild, transaction, teamMate);
@@ -1178,7 +1180,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (team == null) {
 					throw new InteractionError(`Team does not exist`);
 				}
-				await interaction.reply({ ephemeral: true, content: `Renaming team...` });
+				await interaction.reply({ ephemeral, content: `Renaming team...` });
 				// rename team
 				await renameTeam(interaction.guild, transaction, team, newTeamName);
 				// reply to interaction
@@ -1195,7 +1197,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (workshop.id == null) {
 					throw new InteractionError(`Workshop does not exist`);
 				}
-				await interaction.reply({ ephemeral: true, content: `Moving people to their team voice channels...` });
+				await interaction.reply({ ephemeral, content: `Moving people to their team voice channels...` });
 				// move everyone in a workshop to their respective teams if they have one
 				const channel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
 				assert(channel);
@@ -1243,7 +1245,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (workshopsChannel == null) {
 					throw new InteractionError(`No "workshops" channel exists`);
 				}
-				await interaction.reply({ ephemeral: true, content: `Creating workshop...` });
+				await interaction.reply({ ephemeral, content: `Creating workshop...` });
 				// create workshop
 				((await transaction.fetch(`/workshops`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
@@ -1270,7 +1272,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				workshop.discordVoiceChannelId = voiceChannel.id;
 				// reply to interaction
 				await transaction.commit();
-				await interaction.followUp({ ephemeral: true, content: `Created workshop` });
+				await interaction.followUp({ ephemeral, content: `Created workshop` });
 				await message.edit({
 					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
 					components: [
@@ -1301,22 +1303,22 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					result.push(`Team ${team.name} with ID ${team.id} and members ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")}`);
 					if (result.length >= 8) {
 						if (first) {
-							await interaction.reply({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+							await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 							first = false;
 						} else {
-							await interaction.followUp({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+							await interaction.followUp({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 						}
 						result.splice(0, result.length);
 					}
 				}
 				if (result.length > 0) {
 					if (first) {
-						await interaction.reply({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+						await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 					} else {
-						await interaction.followUp({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+						await interaction.followUp({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 					}
 				} else if (first) {
-					await interaction.reply({ ephemeral: true, content: "no teams :/" });
+					await interaction.reply({ ephemeral, content: "no teams :/" });
 				}
 				return;
 			}
@@ -1329,22 +1331,22 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					result.push(`${workshop.name} with code ${workshop.id} hosted by <@${workshop.hostDiscordUserId}>`);
 					if (result.length >= 8) {
 						if (first) {
-							await interaction.reply({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+							await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 							first = false;
 						} else {
-							await interaction.followUp({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+							await interaction.followUp({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 						}
 						result.splice(0, result.length);
 					}
 				}
 				if (result.length > 0) {
 					if (first) {
-						await interaction.reply({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+						await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 					} else {
-						await interaction.followUp({ ephemeral: true, content: result.join("\n"), allowedMentions: { parse: [] } });
+						await interaction.followUp({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
 					}
 				} else if (first) {
-					await interaction.reply({ ephemeral: true, content: "no workshops :/" });
+					await interaction.reply({ ephemeral, content: "no workshops :/" });
 				}
 				return;
 			}
@@ -1361,7 +1363,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// confirmation
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
-					ephemeral: true,
+					ephemeral,
 					content: `Just to confirm, are you attempting to destroy ${workshop.name} with code ${workshop.id}`,
 					components: [
 						new MessageActionRow().addComponents(
@@ -1392,7 +1394,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (nextInteraction.customId.endsWith("no")) {
 					throw new InteractionError(`Cancelled workshop destruction`);
 				}
-				await interaction.followUp({ ephemeral: true, content: `Destroying workshop...` });
+				await interaction.followUp({ ephemeral, content: `Destroying workshop...` });
 				// destroy workshop interaction
 				if (workshop.interactionId) {
 					removeFromArray((await transaction.fetch(`/interactions`)).ids ??= [], workshop.interactionId);
@@ -1526,7 +1528,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					}
 				}
 				// complete command and commit transaction
-				await interaction.reply({ ephemeral: true, content: `Creating team invitation...` });
+				await interaction.reply({ ephemeral, content: `Creating team invitation...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamInvitationOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateUsers.map(u => `<@${u.discordUserId}>`), [], [], true));
@@ -1575,7 +1577,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// confirm with caller
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
-					ephemeral: true,
+					ephemeral,
 					content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMateDiscordIds.map(i => `<@${i}>`).join(", ")}?`,
 					components: [
 						new MessageActionRow().addComponents(
@@ -1611,7 +1613,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Requested team is full`);
 				}
 				// complete command and commit transaction
-				await interaction.followUp({ ephemeral: true, content: `Creating join request...` });
+				await interaction.followUp({ ephemeral, content: `Creating join request...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], [], true));
@@ -1663,7 +1665,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					teamMateDiscordUserIds.push((await fetchUser(transaction, memberId)).discordUserId);
 				};
 				// complete command and commit transaction
-				await interaction.reply({ ephemeral: true, content: `Creating rename request...` });
+				await interaction.reply({ ephemeral, content: `Creating rename request...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [`<@${callerUser.discordUserId}>`], [], true));
@@ -1704,7 +1706,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				// create message with further instructions for leaving a team
 				await interaction.reply({
-					ephemeral: true,
+					ephemeral,
 					content: [
 						"Hello! It seems you want to leave your team. ",
 						"There are many consequences with leaving a team, such as",
@@ -1792,7 +1794,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				// complete command and commit transaction
 				await transaction.commit();
-				await interaction.reply({ ephemeral: true, content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D (Make sure your DMs are open so I can contact you after 30 mins.)" });
+				await interaction.reply({ ephemeral, content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D (Make sure your DMs are open so I can contact you after 30 mins.)" });
 				return;
 			}
 		}
@@ -1801,7 +1803,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
 		// fallback when command aint implemented
 		console.log(`not implemented: ${interaction.commandName}`);
-		await interaction.reply({ ephemeral: true, content: "not implemented yet lol" });
+		await interaction.reply({ ephemeral, content: "not implemented yet lol" });
 
 	} catch (e) {
 		let content: string;
@@ -1812,10 +1814,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			content = e.message;
 		}
 		try {
-			await interaction.reply({ ephemeral: true, content });
+			await interaction.reply({ ephemeral, content });
 		} catch (_) {
 			try {
-				await interaction.followUp({ ephemeral: true, content });
+				await interaction.followUp({ ephemeral, content });
 			} catch (e) {
 				console.log(`Couldn't send error: ${e}`);
 			}
