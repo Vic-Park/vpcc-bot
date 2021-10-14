@@ -570,7 +570,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		assert(interaction.guild);
 		assert(interaction.channel);
 		const message = await interaction.channel.messages.fetch((await interaction.fetchReply()).id);
-		const caller = await interaction.guild.members.fetch(interaction.user.id);
 		const transaction = createTransaction(resources);
 		if (!((await transaction.fetch(`/interactions`)).interactionIds ?? []).includes(interaction.message.id)) {
 			// await interaction.editReply(`Could not find interaction to continue`);
@@ -581,9 +580,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		const info = await transaction.fetch(`/interaction/${interaction.message.id}`);
 		if (info.type === "teamCreate") {
 			// ensure caller
-			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 			if (callerUser == null) {
-				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 			}
 			async function createTeamInvitationOptionsFromInfo(info: Record<string, any>, disabled: boolean = false): Promise<MessageOptions> {
 				return createTeamInvitationOptions(
@@ -721,9 +720,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				)
 			}
 			// ensure caller
-			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 			if (callerUser == null) {
-				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 			}
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id)) {
@@ -735,7 +734,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
-				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
+				const callerDiscordUserId = (await fetchUser(transaction, info.caller)).discordUserId;
 				if (info.approved.length > numMembers / 2) {
 					// fail if team is full
 					if (team.memberIds.length >= 4) {
@@ -744,7 +743,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						clearObject(info);
 						await transaction.commit();
 						await message.edit(options);
-						await message.reply(`${callerDiscordUser}'s requested team is now full`);
+						await message.reply(`<@${callerDiscordUserId}>'s requested team is now full`);
 						return;
 					}
 					// fail if caller is already in a team
@@ -754,7 +753,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						clearObject(info);
 						await transaction.commit();
 						await message.edit(options);
-						await message.reply(`${callerDiscordUser} now has a team`);
+						await message.reply(`<@${callerDiscordUserId}> now has a team`);
 						return;
 					}
 					await joinTeam(interaction.guild, transaction, team, callerUser);
@@ -763,12 +762,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					clearObject(info);
 					await transaction.commit();
 					await message.edit(options);
-					await message.reply(`${callerDiscordUser} joined team ${team.name}`);
+					await message.reply(`<@${callerDiscordUserId}> joined team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Approved request from ${callerDiscordUser.user.username} to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Approved request from <@${callerDiscordUserId}> to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
@@ -781,19 +780,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
-				const callerDiscordUser = await interaction.guild.members.fetch((await fetchUser(transaction, info.caller)).discordUserId);
+				const callerDiscordUserId = (await fetchUser(transaction, info.caller)).discordUserId;
 				if (info.rejected.length >= numMembers / 2) {
 					const options = await createTeamJoinRequestOptionsFromInfo(info, true);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
 					await message.edit(options);
-					await message.reply(`Rejected ${callerDiscordUser}'s request to join team ${team.name}`);
+					await message.reply(`Rejected <@${callerDiscordUserId}>'s request to join team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Rejected request from ${callerDiscordUser.user.username} to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Rejected request from <@${callerDiscordUserId}> to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
@@ -824,9 +823,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				)
 			}
 			// ensure caller
-			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 			if (callerUser == null) {
-				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 			}
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id) {
@@ -909,9 +908,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		}
 		if (info.type === "teamJoinRandom") {
 			// ensure caller
-			let callerUser = await findUser(transaction, { discordUserId: caller.id });
+			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 			if (callerUser == null) {
-				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 			}
 			if (interaction.customId === "teamUp") {
 				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
@@ -959,6 +958,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 		}
 		if (info.type === "workshopRole") {
+			const caller = await interaction.guild.members.fetch(interaction.user.id);
 			const workshop = await transaction.fetch(`/workshop/${info.workshopId}`);
 			if (interaction.customId === "add") {
 				await caller.roles.add(workshop.discordRoleId);
@@ -1018,13 +1018,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		}
 
 		if (interaction.commandName === "admin") {
-			const caller = await interaction.guild.members.fetch(interaction.user.id);
-			if (!caller.roles.cache.find((role: Role) => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
+			if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["supervisor", "leader"].includes(role.name.toLowerCase()))) {
 				throw new InteractionError(`You are not an admin`);
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
-				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
+				if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
 					throw new InteractionError(`You are not a bot maintainer`);
 				}
 				await interaction.reply({ ephemeral, content: "*getting*" });
@@ -1048,7 +1047,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "set") {
-				if (!caller.roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
+				if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
 					throw new InteractionError(`You are not a bot maintainer`);
 				}
 				await interaction.reply({ ephemeral, content: "*updating*" });
@@ -1147,7 +1146,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const nextInteraction = await new Promise(resolve => {
 					assert(interaction.channel);
 					const collector = interaction.channel.createMessageComponentCollector({
-						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === caller.id,
+						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === interaction.user.id,
 						time: 10000,
 						max: 1,
 					});
@@ -1382,7 +1381,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const nextInteraction = await new Promise(resolve => {
 					assert(interaction.channel);
 					const collector = interaction.channel.createMessageComponentCollector({
-						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === caller.id,
+						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === interaction.user.id,
 						time: 10000,
 						max: 1,
 					});
@@ -1556,7 +1555,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// log command and setup transaction
 				console.log([ "team", "join", teamName, metadata ]);
 				const transaction = createTransaction(resources);
-				const caller = await interaction.guild.members.fetch(interaction.user.id);
 				// fail if team with name doesnt exists
 				const team = await findTeam(transaction, { name: teamName });
 				if (team == null) {
@@ -1692,11 +1690,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// log command and setup transaction
 				console.log([ "team", "leave", metadata ]);
 				const transaction = createTransaction(resources);
-				const caller = interaction.user;
 				// create caller
-				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (callerUser == null) {
-					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 				}
 				// fail if caller isn't in a team
 				if (callerUser.teamId == null) {
@@ -1721,11 +1718,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// log command and setup transaction
 				console.log([ "team", "join-random", metadata ]);
 				const transaction = createTransaction(resources);
-				const caller = interaction.user;
 				// create caller
-				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (callerUser == null) {
-					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
 				}
 				// fail if caller is in a team
 				if (callerUser.teamId != null) {
@@ -1763,7 +1759,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// create delayed interaction info
 				const message = await interaction.channel.send({
-					content: `${caller} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
+					content: `${interaction.user} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
