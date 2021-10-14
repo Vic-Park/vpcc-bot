@@ -1648,24 +1648,24 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					const team = await fetchTeam(resources, teamId);
 					const teamMates = [];
 					for (const memberId of team.memberIds) {
-						teamMates.push(await interaction.guild.members.fetch((await fetchUser(resources, memberId)).discordUserId));
+						teamMates.push(await fetchUser(resources, memberId));
 					};
-					result.push(`Team ${team.name} with ID ${team.id} and members ${teamMates.map(member => member.user.username).join(", ")}`);
+					result.push(`Team ${team.name} with ID ${team.id} and members ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")}`);
 					if (result.length >= 8) {
 						if (first) {
-							await interaction.editReply(result.join("\n"));
+							await interaction.editReply({ content: result.join("\n"), allowedMentions: { parse: [] } });
 							first = false;
 						} else {
-							await interaction.followUp(result.join("\n"));
+							await interaction.followUp({ content: result.join("\n"), allowedMentions: { parse: [] } });
 						}
 						result.splice(0, result.length);
 					}
 				}
 				if (result.length > 0) {
 					if (first) {
-						await interaction.editReply(result.join("\n"));
+						await interaction.editReply({ content: result.join("\n"), allowedMentions: { parse: [] } });
 					} else {
-						await interaction.followUp(result.join("\n"));
+						await interaction.followUp({ content: result.join("\n"), allowedMentions: { parse: [] } });
 					}
 				} else if (first) {
 					await interaction.editReply("no teams :/");
@@ -1679,22 +1679,22 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let first = true;
 				for (const workshopId of (await resources.fetch(`/workshops`)).ids ??= []) {
 					const workshop = await resources.fetch(`/workshop/${workshopId}`);
-					result.push(`${workshop.name} with code ${workshop.id} hosted by ${(await interaction.guild.members.fetch(workshop.hostDiscordUserId)).user.username}`);
+					result.push(`${workshop.name} with code ${workshop.id} hosted by <@${workshop.hostDiscordUserId}>`);
 					if (result.length >= 8) {
 						if (first) {
-							await interaction.editReply(result.join("\n"));
+							await interaction.editReply({ content: result.join("\n"), allowedMentions: { parse: [] } });
 							first = false;
 						} else {
-							await interaction.followUp(result.join("\n"));
+							await interaction.followUp({ content: result.join("\n"), allowedMentions: { parse: [] } });
 						}
 						result.splice(0, result.length);
 					}
 				}
 				if (result.length > 0) {
 					if (first) {
-						await interaction.editReply(result.join("\n"));
+						await interaction.editReply({ content: result.join("\n"), allowedMentions: { parse: [] } });
 					} else {
-						await interaction.followUp(result.join("\n"));
+						await interaction.followUp({ content: result.join("\n"), allowedMentions: { parse: [] } });
 					}
 				} else if (first) {
 					await interaction.editReply("no workshops :/");
