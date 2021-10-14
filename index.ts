@@ -838,6 +838,10 @@ const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<v
 			components: [
 				new MessageActionRow().addComponents(
 					new MessageButton()
+						.setCustomId("teamUp")
+						.setLabel("Team Up")
+						.setStyle("SUCCESS"),
+					new MessageButton()
 						.setCustomId("cancel")
 						.setLabel("Cancel")
 						.setStyle("SECONDARY"),
@@ -1252,6 +1256,35 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			if (callerUser == null) {
 				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
 			}
+			if (interaction.customId === "teamUp") {
+				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
+				// fail if its the same dude lol
+				if (joinRandomInfo.caller === callerUser.id) {
+					return await error(`You can't team up with youself`);
+				}
+				// generate a random team name that doesn't exist
+				const teamName = `${Math.floor(Math.random() * 2000)}`
+				if (await findTeam(transaction, { name: teamName }) != null)
+					throw Error("lol just try again pls: team name collided");
+				const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
+				// fail if the other dude made a team already
+				if (otherUser.teamId != null) {
+					return await error(`Other user now has a team`);
+				}
+				// make a team with them and have it be open to others
+				const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
+				await joinTeam(interaction.guild, transaction, team, otherUser);
+				await joinTeam(interaction.guild, transaction, team, callerUser);
+				// remove previous message and clear info
+				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ??= [], joinRandomInfo.interactionId);
+				clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
+				clearObject(joinRandomInfo);
+				// complete command
+				await transaction.commit();
+				await interaction.channel.send(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+				await (await interaction.channel.messages.fetch(interaction.message.id)).delete();
+				return;
+			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
 					return await error(`You aren't the original requester`);
@@ -1263,7 +1296,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await interaction.reply({ content: `Cancelled join random request`, ephemeral: true });
+				await interaction.followUp({ ephemeral: true, content: `Cancelled join random request` });
 				await (await interaction.channel.messages.fetch(interaction.message.id)).delete();
 				return;
 			}
@@ -1286,7 +1319,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 	} catch (e) {
 		console.error(e);
 		try {
-			await interaction.followUp(`Oops, an internal error occurred: ${e}`);
+			await interaction.followUp({ ephemeral: true, content: `Oops, an internal error occurred: ${e}` });
 		} catch (e) {
 			console.log(e);
 		}
