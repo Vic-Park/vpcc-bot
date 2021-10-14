@@ -369,7 +369,7 @@ async function destroyTeam(guild: Guild, transaction: Fetchable, team: TeamData)
 	removeFromArray((teams.teamIds ??= []), team.id);
 	clearObject(team);
 }
-
+    
 async function checkJoinRandom() {
 	const guild = await client.guilds.fetch(process.env.GUILD_ID!);
 	console.log("running check on joinRandom");
@@ -536,329 +536,6 @@ function createTeamRenameRequestOptions(
 		],
 	};
 }
-
-const teamFunctions: Record<string, (i: CommandInteraction, m: any) => Promise<void>> = {
-	async create(interaction: CommandInteraction, metadata: any) {
-		assert(interaction.guild);
-		assert(interaction.channel);
-		const teamName = interaction.options.getString("team-name", true);
-		const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
-		const member2 = interaction.options.getUser("member2", false);
-		const member3 = interaction.options.getUser("member3", false);
-		const teamMates = [member1];
-		if (member2 != null)
-			teamMates.push(await interaction.guild.members.fetch(member2));
-		if (member3 != null)
-			teamMates.push(await interaction.guild.members.fetch(member3));
-		// log command and setup transaction
-		console.log([ "team", "create", teamName, teamMates, metadata ]);
-		const transaction = createTransaction(resources);
-		const caller = await interaction.guild.members.fetch(interaction.user.id);
-		// fail if another team with same name exists
-		if (await findTeam(transaction, { name: teamName }) != null) {
-			throw new InteractionError(`Team called ${teamName} already exists`);
-		}
-		// fail if name is longer than 32 characters
-		if (!(teamName.length <= 32)) {
-			throw new InteractionError(`Team name ${teamName} too long`);
-		}
-		// fail if caller was specified
-		if (teamMates.some(member => caller.id === member.id)) {
-			throw new InteractionError(`Caller was specified again as a team mate`);
-		}
-		// fail if team mates aren't unique
-		if ((new Set(teamMates.map(member => member.id))).size !== teamMates.length) {
-			throw new InteractionError(`A team mate was repeated in the command`);
-		}
-		// create caller and team mates
-		let callerUser = await findUser(transaction, { discordUserId: caller.id });
-		if (!callerUser)
-			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
-		const teamMateUsers = await Promise.all(teamMates.map(async teamMate => {
-			let teamMateUser = await findUser(transaction, { discordUserId: teamMate.id });
-			if (!teamMateUser)
-				teamMateUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${teamMate.id}`, discordUserId: teamMate.id });
-			return teamMateUser;
-		}));
-		// fail if caller is already in a team
-		if (callerUser.teamId != null) {
-			throw new InteractionError(`You are still in a team`);
-		}
-		// fail if a team mate is already in a team
-		for (const teamMateUser of teamMateUsers) {
-			if (teamMateUser.teamId != null) {
-				throw new InteractionError(`A team mate is still in a team`);
-			}
-		}
-		// complete command and commit transaction
-		await interaction.reply({ ephemeral: true, content: `Creating team invitation...` });
-		await transaction.commit();
-		// create message that has buttons for confirming stuff
-		const reply = await interaction.channel.send(createTeamInvitationOptions(teamName, caller, teamMates, [], [], true));
-		// create delayed interaction info
-		const transaction2 = createTransaction(resources);
-		((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
-		const info = await transaction2.fetch(`/interaction/${reply.id}`);
-		Object.assign(info, {
-			id: reply.id,
-			type: "teamCreate",
-			futureTeamId: interaction.id,
-			futureTeamName: teamName,
-			waiting: teamMateUsers.map(u => u.id),
-			accepted: [],
-			declined: [],
-			caller: callerUser.id,
-		});
-		await transaction2.commit();
-		// enable the buttons
-		await reply.edit(createTeamInvitationOptions(teamName, caller, teamMates, [], []));
-	},
-	async join(interaction: CommandInteraction, metadata: any) {
-		assert(interaction.guild);
-		assert(interaction.channel);
-		const teamName = interaction.options.getString("team-name", true);
-		// log command and setup transaction
-		console.log([ "team", "join", teamName, metadata ]);
-		const transaction = createTransaction(resources);
-		const caller = await interaction.guild.members.fetch(interaction.user.id);
-		// fail if team with name doesnt exists
-		const team = await findTeam(transaction, { name: teamName });
-		if (team == null) {
-			throw new InteractionError(`Team called ${teamName} doesn't exist`);
-		}
-		// create caller
-		let callerUser = await findUser(transaction, { discordUserId: caller.id });
-		if (!callerUser)
-			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
-		// fail if caller is already in a team
-		if (callerUser.teamId != null) {
-			throw new InteractionError(`You are still in a team`);
-		}
-		const teamMates = [];
-		for (const memberId of team.memberIds) {
-			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
-		};
-		// confirm with caller
-		const customIdPrefix = `${Date.now()}${interaction.user.id}`;
-		await interaction.reply({
-			ephemeral: true,
-			content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMates.map(member => member.user.username).join(", ")}?`,
-			components: [
-				new MessageActionRow().addComponents(
-					new MessageButton()
-						.setCustomId(customIdPrefix + "yes")
-						.setLabel("Confirm")
-						.setStyle("SUCCESS"),
-					new MessageButton()
-						.setCustomId(customIdPrefix + "no")
-						.setLabel("Cancel")
-						.setStyle("DANGER"),
-				),
-			],
-		});
-		// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
-		const nextInteraction = await new Promise(resolve => {
-			assert(interaction.channel);
-			const collector = interaction.channel.createMessageComponentCollector({
-				filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === caller.id,
-				time: 10000,
-				max: 1,
-			});
-			collector.on("end", collected => resolve(collected.first()));
-		}) as MessageComponentInteraction | undefined;
-		if (nextInteraction == null) {
-			throw new InteractionError(`Confirmation timed out`);
-		}
-		if (nextInteraction.customId.endsWith("no")) {
-			throw new InteractionError(`Cancelled join request`);
-		}
-		// fail if team is full
-		if (team.memberIds.length >= 4) {
-			throw new InteractionError(`Requested team is full`);
-		}
-		// complete command and commit transaction
-		await interaction.followUp({ content: `Creating join request...`, ephemeral: true });
-		await transaction.commit();
-		// create message that has buttons for confirming stuff
-		const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, caller, teamMates, [], [], true));
-		// create delayed interaction info
-		const transaction2 = createTransaction(resources);
-		((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
-		const info = await transaction2.fetch(`/interaction/${reply.id}`);
-		Object.assign(info, {
-			id: reply.id,
-			type: "teamJoin",
-			teamId: team.id,
-			waiting: [...team.memberIds],
-			approved: [],
-			rejected: [],
-			caller: callerUser.id,
-		});
-		await transaction2.commit();
-		// enable the buttons
-		await reply.edit(createTeamJoinRequestOptions(teamName, caller, teamMates, [], []));
-	},
-	async rename(interaction: CommandInteraction, metadata: any) {
-		assert(interaction.guild);
-		assert(interaction.channel);
-		const newTeamName = interaction.options.getString("new-team-name", true);
-		// log command and setup transaction
-		console.log([ "team", "rename", newTeamName, metadata ]);
-		const transaction = createTransaction(resources);
-		const caller = await interaction.guild.members.fetch(interaction.user.id);
-		// create caller
-		let callerUser = await findUser(transaction, { discordUserId: caller.id });
-		if (callerUser == null) {
-			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
-		}
-		// fail if caller isn't in a team
-		if (callerUser.teamId == null) {
-			throw new InteractionError(`You are not in a team`);
-		}
-		// fail if name is longer than 32 characters
-		if (!(newTeamName.length <= 32)) {
-			throw new InteractionError(`Team name ${newTeamName} too long`);
-		}
-		// fail if another team with same name exists
-		if (await findTeam(transaction, { name: newTeamName }) != null) {
-			throw new InteractionError(`Team called ${newTeamName} already exists`);
-		}
-		const team = await fetchTeam(transaction, callerUser.teamId);
-		const teamMates = [];
-		for (const memberId of team.memberIds) {
-			teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
-		};
-		// complete command and commit transaction
-		await interaction.reply({ content: `Creating rename request...`, ephemeral: true });
-		await transaction.commit();
-		// create message that has buttons for confirming stuff
-		const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], [], true));
-		// create delayed interaction info
-		const transaction2 = createTransaction(resources);
-		((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
-		const info = await transaction2.fetch(`/interaction/${reply.id}`);
-		Object.assign(info, {
-			id: reply.id,
-			type: "teamRename",
-			teamId: team.id,
-			waiting: removeFromArray([...team.memberIds], callerUser.id),
-			approved: [callerUser.id],
-			rejected: [],
-			caller: callerUser.id,
-			newTeamName,
-		});
-		await transaction2.commit();
-		// enable the buttons
-		await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], []));
-	},
-	async leave(interaction: CommandInteraction, metadata: any) {
-		await interaction.deferReply();
-		// log command and setup transaction
-		console.log([ "team", "leave", metadata ]);
-		const transaction = createTransaction(resources);
-		const caller = interaction.user;
-		// create caller
-		let callerUser = await findUser(transaction, { discordUserId: caller.id });
-		if (callerUser == null) {
-			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
-		}
-		// fail if caller isn't in a team
-		if (callerUser.teamId == null) {
-			throw new InteractionError(`You are not in a team`);
-		}
-		// complete command and commit transaction
-		await transaction.commit();
-		// create message with further instructions for leaving a team
-		await interaction.editReply([
-			"Hello! It seems you want to leave your team. ",
-			"There are many consequences with leaving a team, such as",
-			"not being able to join back, no points being awarded to you after this month, and more.",
-			"If you understand these consequences and still wish to continue,",
-			"please DM a leader for further action. Thanks :D",
-		].join(" "));
-	},
-	"join-random": async (interaction: CommandInteraction, metadata: any) => {
-		assert(interaction.guild);
-		assert(interaction.channel);
-		// log command and setup transaction
-		console.log([ "team", "join-random", metadata ]);
-		const transaction = createTransaction(resources);
-		const caller = interaction.user;
-		// create caller
-		let callerUser = await findUser(transaction, { discordUserId: caller.id });
-		if (callerUser == null) {
-			callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
-		}
-		// fail if caller is in a team
-		if (callerUser.teamId != null) {
-			throw new InteractionError(`You are already in a team`);
-		}
-		// get joinRandom info
-		const joinRandomInfo = await transaction.fetch(`/joinRandom`);
-		// if there's another person tryna join a team
-		if ("start" in joinRandomInfo) {
-			// fail if its the same dude lol
-			if (joinRandomInfo.caller === callerUser.id) {
-				throw new InteractionError(`You are already waiting to join a random team`);
-			}
-			// generate a random team name that doesn't exist
-			const teamName = `${Math.floor(Math.random() * 2000)}`
-			if (await findTeam(transaction, { name: teamName }) != null)
-				throw Error("lol just try again pls: team name collided");
-			const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
-			// fail if the other dude made a team already
-			if (otherUser.teamId == null) {
-				// make a team with them and have it be open to others
-				const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
-				await joinTeam(interaction.guild, transaction, team, otherUser);
-				await joinTeam(interaction.guild, transaction, team, callerUser);
-				// remove previous message and clear info
-				(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
-				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
-				clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
-				clearObject(joinRandomInfo);
-				// complete command
-				await transaction.commit();
-				await interaction.reply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
-				return;
-			}
-		}
-		// create delayed interaction info
-		const message = await interaction.channel.send({
-			content: `${caller} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
-			components: [
-				new MessageActionRow().addComponents(
-					new MessageButton()
-						.setCustomId("teamUp")
-						.setLabel("Team Up")
-						.setStyle("SUCCESS"),
-					new MessageButton()
-						.setCustomId("cancel")
-						.setLabel("Cancel")
-						.setStyle("SECONDARY"),
-				),
-			],
-		});
-		((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
-		const info = await transaction.fetch(`/interaction/${message.id}`);
-		Object.assign(info, {
-			id: message.id,
-			type: "teamJoinRandom",
-			caller: callerUser.id,
-		});
-		// update joinRandom info
-		Object.assign(joinRandomInfo, {
-			caller: callerUser.id,
-			start: Date.now(),
-			discordChannelId: message.channel.id,
-			discordMessageId: message.id,
-			interactionId: message.id,
-		});
-		// complete command and commit transaction
-		await transaction.commit();
-		await interaction.reply({ ephemeral: true, content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D (Make sure your DMs are open so I can contact you after 30 mins.)" });
-	},
-};
 
 // accept: ✅
 // deny: ❌
@@ -1815,8 +1492,323 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
 		if (interaction.commandName === "team") {
 			const subcommandName = interaction.options.getSubcommand(true);
-			if (subcommandName in teamFunctions) {
-				await teamFunctions[subcommandName](interaction, metadata);
+			if (subcommandName === "create") {
+				const teamName = interaction.options.getString("team-name", true);
+				const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
+				const member2 = interaction.options.getUser("member2", false);
+				const member3 = interaction.options.getUser("member3", false);
+				const teamMates = [member1];
+				if (member2 != null)
+					teamMates.push(await interaction.guild.members.fetch(member2));
+				if (member3 != null)
+					teamMates.push(await interaction.guild.members.fetch(member3));
+				// log command and setup transaction
+				console.log([ "team", "create", teamName, teamMates, metadata ]);
+				const transaction = createTransaction(resources);
+				const caller = await interaction.guild.members.fetch(interaction.user.id);
+				// fail if another team with same name exists
+				if (await findTeam(transaction, { name: teamName }) != null) {
+					throw new InteractionError(`Team called ${teamName} already exists`);
+				}
+				// fail if name is longer than 32 characters
+				if (!(teamName.length <= 32)) {
+					throw new InteractionError(`Team name ${teamName} too long`);
+				}
+				// fail if caller was specified
+				if (teamMates.some(member => caller.id === member.id)) {
+					throw new InteractionError(`Caller was specified again as a team mate`);
+				}
+				// fail if team mates aren't unique
+				if ((new Set(teamMates.map(member => member.id))).size !== teamMates.length) {
+					throw new InteractionError(`A team mate was repeated in the command`);
+				}
+				// create caller and team mates
+				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				if (!callerUser)
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				const teamMateUsers = await Promise.all(teamMates.map(async teamMate => {
+					let teamMateUser = await findUser(transaction, { discordUserId: teamMate.id });
+					if (!teamMateUser)
+						teamMateUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${teamMate.id}`, discordUserId: teamMate.id });
+					return teamMateUser;
+				}));
+				// fail if caller is already in a team
+				if (callerUser.teamId != null) {
+					throw new InteractionError(`You are still in a team`);
+				}
+				// fail if a team mate is already in a team
+				for (const teamMateUser of teamMateUsers) {
+					if (teamMateUser.teamId != null) {
+						throw new InteractionError(`A team mate is still in a team`);
+					}
+				}
+				// complete command and commit transaction
+				await interaction.reply({ ephemeral: true, content: `Creating team invitation...` });
+				await transaction.commit();
+				// create message that has buttons for confirming stuff
+				const reply = await interaction.channel.send(createTeamInvitationOptions(teamName, caller, teamMates, [], [], true));
+				// create delayed interaction info
+				const transaction2 = createTransaction(resources);
+				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
+				const info = await transaction2.fetch(`/interaction/${reply.id}`);
+				Object.assign(info, {
+					id: reply.id,
+					type: "teamCreate",
+					futureTeamId: interaction.id,
+					futureTeamName: teamName,
+					waiting: teamMateUsers.map(u => u.id),
+					accepted: [],
+					declined: [],
+					caller: callerUser.id,
+				});
+				await transaction2.commit();
+				// enable the buttons
+				await reply.edit(createTeamInvitationOptions(teamName, caller, teamMates, [], []));
+				return;
+			}
+			if (subcommandName === "join") {
+				const teamName = interaction.options.getString("team-name", true);
+				// log command and setup transaction
+				console.log([ "team", "join", teamName, metadata ]);
+				const transaction = createTransaction(resources);
+				const caller = await interaction.guild.members.fetch(interaction.user.id);
+				// fail if team with name doesnt exists
+				const team = await findTeam(transaction, { name: teamName });
+				if (team == null) {
+					throw new InteractionError(`Team called ${teamName} doesn't exist`);
+				}
+				// create caller
+				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				if (!callerUser)
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				// fail if caller is already in a team
+				if (callerUser.teamId != null) {
+					throw new InteractionError(`You are still in a team`);
+				}
+				const teamMates = [];
+				for (const memberId of team.memberIds) {
+					teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+				};
+				// confirm with caller
+				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
+				await interaction.reply({
+					ephemeral: true,
+					content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMates.map(member => member.user.username).join(", ")}?`,
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId(customIdPrefix + "yes")
+								.setLabel("Confirm")
+								.setStyle("SUCCESS"),
+							new MessageButton()
+								.setCustomId(customIdPrefix + "no")
+								.setLabel("Cancel")
+								.setStyle("DANGER"),
+						),
+					],
+				});
+				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
+				const nextInteraction = await new Promise(resolve => {
+					assert(interaction.channel);
+					const collector = interaction.channel.createMessageComponentCollector({
+						filter: (i: MessageComponentInteraction) => i.customId.startsWith(customIdPrefix) && i.user.id === caller.id,
+						time: 10000,
+						max: 1,
+					});
+					collector.on("end", collected => resolve(collected.first()));
+				}) as MessageComponentInteraction | undefined;
+				if (nextInteraction == null) {
+					throw new InteractionError(`Confirmation timed out`);
+				}
+				if (nextInteraction.customId.endsWith("no")) {
+					throw new InteractionError(`Cancelled join request`);
+				}
+				// fail if team is full
+				if (team.memberIds.length >= 4) {
+					throw new InteractionError(`Requested team is full`);
+				}
+				// complete command and commit transaction
+				await interaction.followUp({ content: `Creating join request...`, ephemeral: true });
+				await transaction.commit();
+				// create message that has buttons for confirming stuff
+				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, caller, teamMates, [], [], true));
+				// create delayed interaction info
+				const transaction2 = createTransaction(resources);
+				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
+				const info = await transaction2.fetch(`/interaction/${reply.id}`);
+				Object.assign(info, {
+					id: reply.id,
+					type: "teamJoin",
+					teamId: team.id,
+					waiting: [...team.memberIds],
+					approved: [],
+					rejected: [],
+					caller: callerUser.id,
+				});
+				await transaction2.commit();
+				// enable the buttons
+				await reply.edit(createTeamJoinRequestOptions(teamName, caller, teamMates, [], []));
+				return;
+			}
+			if (subcommandName === "rename") {
+				assert(interaction.guild);
+				assert(interaction.channel);
+				const newTeamName = interaction.options.getString("new-team-name", true);
+				// log command and setup transaction
+				console.log([ "team", "rename", newTeamName, metadata ]);
+				const transaction = createTransaction(resources);
+				const caller = await interaction.guild.members.fetch(interaction.user.id);
+				// create caller
+				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				if (callerUser == null) {
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				}
+				// fail if caller isn't in a team
+				if (callerUser.teamId == null) {
+					throw new InteractionError(`You are not in a team`);
+				}
+				// fail if name is longer than 32 characters
+				if (!(newTeamName.length <= 32)) {
+					throw new InteractionError(`Team name ${newTeamName} too long`);
+				}
+				// fail if another team with same name exists
+				if (await findTeam(transaction, { name: newTeamName }) != null) {
+					throw new InteractionError(`Team called ${newTeamName} already exists`);
+				}
+				const team = await fetchTeam(transaction, callerUser.teamId);
+				const teamMates = [];
+				for (const memberId of team.memberIds) {
+					teamMates.push(await interaction.guild.members.fetch((await fetchUser(transaction, memberId)).discordUserId));
+				};
+				// complete command and commit transaction
+				await interaction.reply({ content: `Creating rename request...`, ephemeral: true });
+				await transaction.commit();
+				// create message that has buttons for confirming stuff
+				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], [], true));
+				// create delayed interaction info
+				const transaction2 = createTransaction(resources);
+				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
+				const info = await transaction2.fetch(`/interaction/${reply.id}`);
+				Object.assign(info, {
+					id: reply.id,
+					type: "teamRename",
+					teamId: team.id,
+					waiting: removeFromArray([...team.memberIds], callerUser.id),
+					approved: [callerUser.id],
+					rejected: [],
+					caller: callerUser.id,
+					newTeamName,
+				});
+				await transaction2.commit();
+				// enable the buttons
+				await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], []));
+				return;
+			}
+			if (subcommandName === "leave") {
+				await interaction.deferReply();
+				// log command and setup transaction
+				console.log([ "team", "leave", metadata ]);
+				const transaction = createTransaction(resources);
+				const caller = interaction.user;
+				// create caller
+				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				if (callerUser == null) {
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				}
+				// fail if caller isn't in a team
+				if (callerUser.teamId == null) {
+					throw new InteractionError(`You are not in a team`);
+				}
+				// complete command and commit transaction
+				await transaction.commit();
+				// create message with further instructions for leaving a team
+				await interaction.editReply([
+					"Hello! It seems you want to leave your team. ",
+					"There are many consequences with leaving a team, such as",
+					"not being able to join back, no points being awarded to you after this month, and more.",
+					"If you understand these consequences and still wish to continue,",
+					"please DM a leader for further action. Thanks :D",
+				].join(" "));
+				return;
+			}
+			if (subcommandName === "join-random") {
+				// log command and setup transaction
+				console.log([ "team", "join-random", metadata ]);
+				const transaction = createTransaction(resources);
+				const caller = interaction.user;
+				// create caller
+				let callerUser = await findUser(transaction, { discordUserId: caller.id });
+				if (callerUser == null) {
+					callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${caller.id}`, discordUserId: caller.id });
+				}
+				// fail if caller is in a team
+				if (callerUser.teamId != null) {
+					throw new InteractionError(`You are already in a team`);
+				}
+				// get joinRandom info
+				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
+				// if there's another person tryna join a team
+				if ("start" in joinRandomInfo) {
+					// fail if its the same dude lol
+					if (joinRandomInfo.caller === callerUser.id) {
+						throw new InteractionError(`You are already waiting to join a random team`);
+					}
+					// generate a random team name that doesn't exist
+					const teamName = `${Math.floor(Math.random() * 2000)}`
+					if (await findTeam(transaction, { name: teamName }) != null)
+						throw Error("lol just try again pls: team name collided");
+					const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
+					// fail if the other dude made a team already
+					if (otherUser.teamId == null) {
+						// make a team with them and have it be open to others
+						const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
+						await joinTeam(interaction.guild, transaction, team, otherUser);
+						await joinTeam(interaction.guild, transaction, team, callerUser);
+						// remove previous message and clear info
+						(await (await interaction.guild.channels.fetch(joinRandomInfo.discordChannelId) as TextChannel).messages.fetch(joinRandomInfo.discordMessageId)).delete();
+						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ?? [], joinRandomInfo.interactionId);
+						clearObject(await transaction.fetch(`/interaction/${joinRandomInfo.interactionId}`));
+						clearObject(joinRandomInfo);
+						// complete command
+						await transaction.commit();
+						await interaction.reply(`Team ${team.name} with members ${await interaction.guild.members.fetch(callerUser.discordUserId)} and ${await interaction.guild.members.fetch(otherUser.discordUserId)} is created`);
+						return;
+					}
+				}
+				// create delayed interaction info
+				const message = await interaction.channel.send({
+					content: `${caller} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId("teamUp")
+								.setLabel("Team Up")
+								.setStyle("SUCCESS"),
+							new MessageButton()
+								.setCustomId("cancel")
+								.setLabel("Cancel")
+								.setStyle("SECONDARY"),
+						),
+					],
+				});
+				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
+				const info = await transaction.fetch(`/interaction/${message.id}`);
+				Object.assign(info, {
+					id: message.id,
+					type: "teamJoinRandom",
+					caller: callerUser.id,
+				});
+				// update joinRandom info
+				Object.assign(joinRandomInfo, {
+					caller: callerUser.id,
+					start: Date.now(),
+					discordChannelId: message.channel.id,
+					discordMessageId: message.id,
+					interactionId: message.id,
+				});
+				// complete command and commit transaction
+				await transaction.commit();
+				await interaction.reply({ ephemeral: true, content: "If you aren't in a team after 30 minutes and haven't cancelled, I'll automatically place you in a team :D (Make sure your DMs are open so I can contact you after 30 mins.)" });
 				return;
 			}
 		}
