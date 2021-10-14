@@ -427,10 +427,10 @@ client.once("ready", async () => {
 
 function createTeamInvitationOptions(
 	teamName: string,
-	caller: GuildMember,
-	waiting: GuildMember[],
-	accepted: GuildMember[],
-	declined: GuildMember[],
+	caller: string,
+	waiting: string[],
+	accepted: string[],
+	declined: string[],
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
@@ -464,10 +464,10 @@ function createTeamInvitationOptions(
 
 function createTeamJoinRequestOptions(
 	teamName: string,
-	caller: GuildMember,
-	waiting: GuildMember[],
-	approved: GuildMember[],
-	rejected: GuildMember[],
+	caller: string,
+	waiting: string[],
+	approved: string[],
+	rejected: string[],
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
@@ -502,10 +502,10 @@ function createTeamJoinRequestOptions(
 function createTeamRenameRequestOptions(
 	teamName: string,
 	newTeamName: string,
-	caller: GuildMember,
-	waiting: GuildMember[],
-	approved: GuildMember[],
-	rejected: GuildMember[],
+	caller: string,
+	waiting: string[],
+	approved: string[],
+	rejected: string[],
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
@@ -586,10 +586,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			async function createTeamInvitationOptionsFromInfo(info: Record<string, any>, disabled: boolean = false): Promise<MessageOptions> {
 				return createTeamInvitationOptions(
 					info.futureTeamName,
-					await interaction.guild!.members.fetch((await fetchUser(transaction, info.caller)).discordUserId),
-					await Promise.all(info.waiting.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.accepted.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.declined.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					`<@${(await fetchUser(transaction, info.caller)).discordUserId}>`,
+					await Promise.all(info.waiting.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.accepted.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.declined.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
 					disabled,
 				)
 			}
@@ -711,10 +711,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			async function createTeamJoinRequestOptionsFromInfo(info: Record<string, any>, disabled: boolean = false): Promise<MessageOptions> {
 				return createTeamJoinRequestOptions(
 					team.name,
-					await interaction.guild!.members.fetch((await fetchUser(transaction, info.caller)).discordUserId),
-					await Promise.all(info.waiting.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.approved.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.rejected.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					`<@${(await fetchUser(transaction, info.caller)).discordUserId}>`,
+					await Promise.all(info.waiting.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.approved.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.rejected.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
 					disabled,
 				)
 			}
@@ -814,10 +814,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return createTeamRenameRequestOptions(
 					team.name,
 					info.newTeamName,
-					await interaction.guild!.members.fetch((await fetchUser(transaction, info.caller)).discordUserId),
-					await Promise.all(info.waiting.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.approved.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
-					await Promise.all(info.rejected.map(async (id: string) => await interaction.guild!.members.fetch((await fetchUser(resources, id)).discordUserId))),
+					`<@${(await fetchUser(transaction, info.caller)).discordUserId}>`,
+					await Promise.all(info.waiting.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.approved.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
+					await Promise.all(info.rejected.map(async (id: string) => `<@${(await fetchUser(resources, id)).discordUserId}>`)),
 					disabled,
 				)
 			}
@@ -1542,7 +1542,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.reply({ ephemeral: true, content: `Creating team invitation...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
-				const reply = await interaction.channel.send(createTeamInvitationOptions(teamName, caller, teamMates, [], [], true));
+				const reply = await interaction.channel.send(createTeamInvitationOptions(teamName, caller.toString(), teamMates.map(m => m.toString()), [], [], true));
 				// create delayed interaction info
 				const transaction2 = createTransaction(resources);
 				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
@@ -1559,7 +1559,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction2.commit();
 				// enable the buttons
-				await reply.edit(createTeamInvitationOptions(teamName, caller, teamMates, [], []));
+				await reply.edit(createTeamInvitationOptions(teamName, caller.toString(), teamMates.map(m => m.toString()), [], []));
 				return;
 			}
 			if (subcommandName === "join") {
@@ -1627,7 +1627,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.followUp({ content: `Creating join request...`, ephemeral: true });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
-				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, caller, teamMates, [], [], true));
+				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, caller.toString(), teamMates.map(m => m.toString()), [], [], true));
 				// create delayed interaction info
 				const transaction2 = createTransaction(resources);
 				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
@@ -1643,7 +1643,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction2.commit();
 				// enable the buttons
-				await reply.edit(createTeamJoinRequestOptions(teamName, caller, teamMates, [], []));
+				await reply.edit(createTeamJoinRequestOptions(teamName, caller.toString(), teamMates.map(m => m.toString()), [], []));
 				return;
 			}
 			if (subcommandName === "rename") {
@@ -1680,7 +1680,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.reply({ content: `Creating rename request...`, ephemeral: true });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
-				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], [], true));
+				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, caller.toString(), removeFromArray(teamMates, caller).map(m => m.toString()), [caller.toString()], [], true));
 				// create delayed interaction info
 				const transaction2 = createTransaction(resources);
 				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
@@ -1697,7 +1697,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction2.commit();
 				// enable the buttons
-				await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, caller, removeFromArray(teamMates, caller), [caller], []));
+				await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, caller.toString(), removeFromArray(teamMates, caller).map(m => m.toString()), [caller.toString()], []));
 				return;
 			}
 			if (subcommandName === "leave") {
