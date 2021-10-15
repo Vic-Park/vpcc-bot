@@ -97,7 +97,16 @@ const commands = [
 			.addBooleanOption(option => option
 				.setName("remove-from-datastore")
 				.setDescription("Whether to remove the workshop from the datastore (default: false)")
-				.setRequired(false))),
+				.setRequired(false)))
+		.addSubcommand(subcommand => subcommand
+			.setName("create-support")
+			.setDescription("Creates a support channel")
+			.addStringOption(option => option
+				.setName("type")
+				.setDescription("Channel type")
+				.setRequired(true)
+				.addChoice("voice", "voice")
+				.addChoice("text", "text"))),
 	new SlashCommandBuilder()
 		.setName("profile")
 		.setDescription("Shows a summary of your profile"),

@@ -1430,6 +1430,28 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send(`Destroyed workshop ${workshopCode}`);
 				return;
 			}
+			if (subcommandName === "create-support") {
+				const channelType = interaction.options.getString("type", true);
+				console.log([ "admin", "create-support", channelType, metadata ]);
+				// fail if no help category exists
+				const helpCategory = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
+					channel instanceof CategoryChannel
+					&& channel.name.toLowerCase() === "help"
+				)) as CategoryChannel | undefined;
+				if (helpCategory == null) {
+					throw new InteractionError(`No "help" category exists`);
+				}
+				const channelName = `Help ${Math.floor(Math.random() * 2000)}`
+				let channel;
+				if (channelType === "text") {
+					channel = await interaction.guild.channels.create(channelName, { parent: helpCategory });
+				} else {
+					channel = await interaction.guild.channels.create(channelName, { parent: helpCategory, type: "GUILD_VOICE" });
+				}
+				// reply to interaction
+				await interaction.reply({ ephemeral, content: `Created ${channelType} support channel ${channel}` });
+				return;
+			}
 		}
 
 		if (interaction.commandName === "profile") {
