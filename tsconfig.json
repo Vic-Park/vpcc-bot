@@ -1,5 +1,4 @@
 {
-    "strictNullChecks": false,
     "compilerOptions": {
         "target": "esnext",
         "module": "commonjs",
