@@ -985,8 +985,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		}
 		try {
 			await interaction.followUp({ ephemeral, content });
-		} catch (_) {
-			console.log(`Couldn't send error: ${e}`);
+		} catch (e) {
+			console.log(`Couldn't send last error: ${e}`);
 		}
 	} finally {
 		running = false;
@@ -1832,13 +1832,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			content = e.message;
 		}
 		try {
-			await interaction.reply({ ephemeral, content });
-		} catch (_) {
-			try {
+			if (!interaction.replied) {
+				await interaction.reply({ ephemeral, content });
+			} else {
 				await interaction.followUp({ ephemeral, content });
-			} catch (e) {
-				console.log(`Couldn't send error: ${e}`);
 			}
+		} catch (e) {
+			console.log(`Couldn't send last error: ${e}`);
 		}
 	} finally {
 		running = false;
