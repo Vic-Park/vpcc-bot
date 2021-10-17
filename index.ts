@@ -734,7 +734,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
-				const callerDiscordUserId = (await fetchUser(transaction, info.caller)).discordUserId;
+				const requester = await fetchUser(transaction, info.caller);
 				if (info.approved.length > numMembers / 2) {
 					// fail if team is full
 					if (team.memberIds.length >= 4) {
@@ -743,31 +743,31 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						clearObject(info);
 						await transaction.commit();
 						await message.edit(options);
-						await message.reply(`<@${callerDiscordUserId}>'s requested team is now full`);
+						await message.reply(`<@${requester.discordUserId}>'s requested team is now full`);
 						return;
 					}
 					// fail if caller is already in a team
-					if (callerUser.teamId != null) {
+					if (requester.teamId != null) {
 						const options = await createTeamJoinRequestOptionsFromInfo(info, true);
 						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 						clearObject(info);
 						await transaction.commit();
 						await message.edit(options);
-						await message.reply(`<@${callerDiscordUserId}> now has a team`);
+						await message.reply(`<@${requester.discordUserId}> now has a team`);
 						return;
 					}
-					await joinTeam(interaction.guild, transaction, team, callerUser);
+					await joinTeam(interaction.guild, transaction, team, requester);
 					const options = await createTeamJoinRequestOptionsFromInfo(info, true);
 					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 					clearObject(info);
 					await transaction.commit();
 					await message.edit(options);
-					await message.reply(`<@${callerDiscordUserId}> joined team ${team.name}`);
+					await message.reply(`<@${requester.discordUserId}> joined team ${team.name}`);
 					return;
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Approved request from <@${callerDiscordUserId}> to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Approved request from <@${requester.discordUserId}> to ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
