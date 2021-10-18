@@ -1111,6 +1111,33 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send(`Removed ${member} from team ${teamName}`);
 				return;
 			}
+			if (subcommandName === "add-to-team") {
+				const teamName = interaction.options.getString("team-name", true);
+				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
+				console.log([ "admin", "remove-from-team", teamName, member, metadata ]);
+				const transaction = createTransaction(resources);
+				// create user if nonexistent
+				let user = await findUser(transaction, { discordUserId: member.id });
+				if (user == null) {
+					user = await createUser(interaction.guild, transaction, { id: `${interaction.id}${member.id}`, discordUserId: member.id });
+				}
+				// fail if has a previous team
+				if (user.teamId != null) {
+					throw new InteractionError(`User is in a team`);
+				}
+				// fail if team name doesnt exist
+				const team = await findTeam(transaction, { name: teamName });
+				if (team == null) {
+					throw new InteractionError(`Team called ${teamName} doesn't exist`);
+				}
+				await interaction.reply({ ephemeral, content: "Adding to team..." });
+				// leave previous team
+				await joinTeam(interaction.guild, transaction, team, user);
+				// reply to interaction
+				await transaction.commit();
+				await interaction.channel.send(`Added <@${member.id}> to team ${teamName}`);
+				return;
+			}
 			if (subcommandName === "delete-team") {
 				const teamName = interaction.options.getString("team-name", true);
 				console.log([ "admin", "delete-team", teamName, metadata ]);

@@ -35,6 +35,17 @@ const commands = [
 			.setName("invalidate")
 			.setDescription("Invalidates the cache"))
 		.addSubcommand(subcommand => subcommand
+			.setName("add-to-team")
+			.setDescription("Adds a user to a team")
+			.addStringOption(option => option
+				.setName("team-name")
+				.setDescription("Name of team")
+				.setRequired(true))
+			.addUserOption(option => option
+				.setName("member")
+				.setDescription("Team member to add")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
 			.setName("remove-from-team")
 			.setDescription("Removes a user from a team")
 			.addStringOption(option => option
