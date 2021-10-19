@@ -1469,6 +1469,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`No "help" category exists`);
 				}
 				const channelName = `Help ${Math.floor(Math.random() * 2000)}`
+				await interaction.reply({ ephemeral, content: `Creating ${channelType} support channel ${channelName}...` });
 				let channel;
 				if (channelType === "text") {
 					channel = await interaction.guild.channels.create(channelName, { parent: helpCategory });
@@ -1476,7 +1477,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					channel = await interaction.guild.channels.create(channelName, { parent: helpCategory, type: "GUILD_VOICE" });
 				}
 				// reply to interaction
-				await interaction.reply({ ephemeral, content: `Created ${channelType} support channel ${channel}` });
+				await interaction.channel.send(`Created ${channelType} support channel ${channel}`);
 				return;
 			}
 		}
