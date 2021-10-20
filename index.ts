@@ -1305,11 +1305,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						new MessageActionRow().addComponents(
 							new MessageButton()
 								.setCustomId("add")
-								.setLabel(`Add ${workshopCode} role`)
+								.setLabel(`Add ${workshopName} role`)
 								.setStyle("SUCCESS"),
 							new MessageButton()
 								.setCustomId("remove")
-								.setLabel(`Remove ${workshopCode} role`)
+								.setLabel(`Remove ${workshopName} role`)
 								.setStyle("DANGER"),
 						),
 					]
