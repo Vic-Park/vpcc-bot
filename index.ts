@@ -1293,9 +1293,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// create workshop channels
 				const channelOptions = { parent: workshopsCategory };
 				const textChannel = await interaction.guild.channels.create(`${workshopName}`, { ...channelOptions });
-				const voiceChannel = await interaction.guild.channels.create(`${workshopName}`, { type: "GUILD_VOICE", ...channelOptions });
+				// const voiceChannel = await interaction.guild.channels.create(`${workshopName}`, { type: "GUILD_VOICE", ...channelOptions });
 				workshop.discordTextChannelId = textChannel.id;
-				workshop.discordVoiceChannelId = voiceChannel.id;
+				// workshop.discordVoiceChannelId = voiceChannel.id;
 				// reply to interaction
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Created workshop` });
