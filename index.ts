@@ -1306,16 +1306,21 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Created workshop` });
 				await message.edit({
-					content: `Workshop: ${workshopName} by ${interaction.user} (code: ${workshopCode}). Press the button to get the workshop role. (The host will ping this role for workshop specific announcements.)`,
+					content: (
+						`New ${workshopName} workshop by ${interaction.user}! (code: ${workshopCode})\n`
+						+ `Text Channel: <#${workshop.discordTextChannelId}>\n`
+						+ `Voice Channel: <#${workshop.discordVoiceChannelId}>\n`
+						+ `Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`
+					),
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
 								.setCustomId("add")
-								.setLabel(`Add ${workshopName} role`)
+								.setLabel(`Get the ${workshopName} role`)
 								.setStyle("SUCCESS"),
 							new MessageButton()
 								.setCustomId("remove")
-								.setLabel(`Remove ${workshopName} role`)
+								.setLabel(`Leave the ${workshopName} role`)
 								.setStyle("DANGER"),
 						),
 					]
