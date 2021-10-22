@@ -961,17 +961,23 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			const caller = await interaction.guild.members.fetch(interaction.user.id);
 			const workshop = await transaction.fetch(`/workshop/${info.workshopId}`);
 			if (interaction.customId === "add") {
+				if (caller.roles.cache.has(workshop.discordRoleId)) {
+					throw new InteractionError(`You already have the ${workshop.name} role`);
+				}
 				await caller.roles.add(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Added ${info.workshopId} role to you` });
+				await interaction.followUp({ ephemeral, content: `Added ${workshop.name} role to you` });
 				return;
 			}
 			if (interaction.customId === "remove") {
+				if (!caller.roles.cache.has(workshop.discordRoleId)) {
+					throw new InteractionError(`You already don't have the ${workshop.name} role`);
+				}
 				await caller.roles.remove(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Removed ${info.workshopId} role from you` });
+				await interaction.followUp({ ephemeral, content: `Removed ${workshop.name} role from you` });
 				return;
 			}
 		}
