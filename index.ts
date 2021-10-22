@@ -271,7 +271,7 @@ async function createTeam(guild: Guild, transaction: Fetchable, { id, ...propert
 	(teams.teamIds ??= []).push(team.id);
 	team.memberIds ??= [];
 	// create team role
-	const role = await guild.roles.create({ name: `${team.name}` });
+	const role = await guild.roles.create({ name: `Team ${team.name}` });
 	team.discordRoleId = role.id;
 	// get supervisor role
 	const supervisorRole = (await guild.roles.fetch()).find((role: { name: string; }) => role.name.toLowerCase() === "supervisor")
@@ -297,8 +297,8 @@ async function createTeam(guild: Guild, transaction: Fetchable, { id, ...propert
 	} else {
 		console.log("sus no supervisor role");
 	}
-	const textChannel = await guild.channels.create(`${team.name}`, channelOptions);
-	const voiceChannel = await guild.channels.create(`${team.name}`, { type: "GUILD_VOICE", ...channelOptions });
+	const textChannel = await guild.channels.create(`Team ${team.name}`, channelOptions);
+	const voiceChannel = await guild.channels.create(`Team ${team.name}`, { type: "GUILD_VOICE", ...channelOptions });
 	team.discordTextChannelId = textChannel.id;
 	team.discordVoiceChannelId = voiceChannel.id;
 	return team;
@@ -325,13 +325,13 @@ async function renameTeam(guild: Guild, _transaction: Fetchable, team: TeamData,
 	const voiceChannel = await guild.channels.fetch(team.discordVoiceChannelId);
 	assert(textChannel);
 	assert(voiceChannel);
-	await textChannel.edit({ name: `${name}` });
-	await voiceChannel.edit({ name: `${name}` });
+	await textChannel.edit({ name: `Team ${name}` });
+	await voiceChannel.edit({ name: `Team ${name}` });
 	// rename role
 	assert(team.discordRoleId);
 	const role = await guild.roles.fetch(team.discordRoleId);
 	assert(role);
-	await role.edit({ name: `${name}` });
+	await role.edit({ name: `Team ${name}` });
 }
 
 async function leaveTeam(guild: Guild, transaction: Fetchable, user: UserData) {
