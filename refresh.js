@@ -57,6 +57,25 @@ const commands = [
 				.setDescription("Team member to remove")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
+			.setName("create-team")
+			.setDescription("Creates a team")
+			.addUserOption(option => option
+				.setName("member0")
+				.setDescription("A team member")
+				.setRequired(true))
+			.addUserOption(option => option
+				.setName("member1")
+				.setDescription("A fellow member")
+				.setRequired(true))
+			.addUserOption(option => option
+				.setName("member2")
+				.setDescription("Another member")
+				.setRequired(false))
+			.addUserOption(option => option
+				.setName("member3")
+				.setDescription("Yet another member")
+				.setRequired(false)))
+		.addSubcommand(subcommand => subcommand
 			.setName("delete-team")
 			.setDescription("Deletes a team")
 			.addStringOption(option => option

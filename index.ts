@@ -1144,6 +1144,50 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send(`Added <@${member.id}> to team ${teamName}`);
 				return;
 			}
+			if (subcommandName === "create-team") {
+				const member0 = await interaction.guild.members.fetch(interaction.options.getUser("member0", true));
+				const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
+				const member2 = interaction.options.getUser("member2", false);
+				const member3 = interaction.options.getUser("member3", false);
+				const members = [member0, member1];
+				if (member2 != null)
+					members.push(await interaction.guild.members.fetch(member2));
+				if (member3 != null)
+					members.push(await interaction.guild.members.fetch(member3));
+				// log command and setup transaction
+				console.log([ "admin", "create-team", members, metadata ]);
+				const transaction = createTransaction(resources);
+				const teamName = `${Math.floor(Math.random() * 2000)}`
+				// fail if another team with same name exists
+				if (await findTeam(transaction, { name: teamName }) != null)
+					throw Error("lol just try again pls: team name collided");
+				// fail if team mates aren't unique
+				if ((new Set(members.map(member => member.id))).size !== members.length)
+					throw new InteractionError(`A member was repeated in the command`);
+				// create caller and team mates
+				const membersUsers = await Promise.all(members.map(async member => {
+					let memberUser = await findUser(transaction, { discordUserId: member.id });
+					if (!memberUser)
+						memberUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${member.id}`, discordUserId: member.id });
+					return memberUser;
+				}));
+				// fail if a team mate is already in a team
+				for (const memberUser of membersUsers)
+					if (memberUser.teamId != null)
+						throw new InteractionError(`A member is still in a team`);
+				// create team
+				await interaction.reply({ ephemeral, content: `Creating team...` });
+				const team = await createTeam(interaction.guild, transaction, {
+					id: interaction.id,
+					name: teamName,
+				});
+				for (const memberUser of membersUsers)
+					await joinTeam(interaction.guild, transaction, team, memberUser);
+				// complete command and commit transaction
+				await transaction.commit();
+				await interaction.channel.send(`Created team ${teamName}`);
+				return;
+			}
 			if (subcommandName === "delete-team") {
 				const teamName = interaction.options.getString("team-name", true);
 				console.log([ "admin", "delete-team", teamName, metadata ]);
