@@ -127,7 +127,12 @@ class Transaction {
 	async fetch(options: ResourceFetchOptions): Promise<Record<string, any>> {
 		if (typeof options === "string")
 			options = { resource: options };
-		return this.data[options.resource] ??= await this.resources.fetch(options);
+		if (this.data[options.resource] != null)
+			return this.data[options.resource];
+		const obj = await this.resources.fetch(options);
+		if (this.data[options.resource] != null)
+			return this.data[options.resource];
+		return this.data[options.resource] = obj;
 	};
 	// pushes all changes and clears data
 	async commit(): Promise<void> {
