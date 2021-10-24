@@ -1810,7 +1810,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (!nextInteraction)
 					throw new InteractionError(`Confirmation timed out`);
 				if (nextInteraction.customId.endsWith("no"))
-					throw new InteractionError(`Cancelled challenge destruction`);
+					throw new InteractionError(`Cancelled submission destruction`);
 				// reply to interaction
 				await interaction.followUp({ ephemeral, content: `Removing submission...` });
 				// get team / challenge
