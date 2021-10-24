@@ -262,8 +262,8 @@ const commands = [
 		.setName("team-profile")
 		.setDescription("Displays a team's profile")
 		.addStringOption(option => option
-			.setName("team-name")
-			.setDescription("Name of team")
+			.setName("team")
+			.setDescription("Team name or ID (defaults to your own)")
 			.setRequired(false)),
 ];
 

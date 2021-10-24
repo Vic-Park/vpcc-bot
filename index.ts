@@ -2287,7 +2287,122 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 		}
 
-		if (interaction.commandName === "leaderboard") { }
+		if (interaction.commandName === "leaderboard") {
+			console.log([ "leaderboard", metadata ]);
+			// throttle to 1 update per 5 minutes
+			let leaderboard = await resources.fetch(`/leaderboard`);
+			if (Date.now() >= (leaderboard.lastUpdatedTimestamp ?? 0) + 5 * 60_000) {
+				const transaction = createTransaction(resources);
+				const leaderboard = await transaction.fetch(`/leaderboard`);
+				leaderboard.lastUpdatedTimestamp = Date.now();
+				// get all teams
+				const teams = [];
+				for (const teamId of (await fetchTeams(transaction)).teamIds ??= [])
+					teams.push(await fetchTeam(transaction, teamId));
+				// get teams' points
+				const teamPoints = new Map();
+				for (const team of teams) {
+					// get linked stuff
+					const submissions = [];
+					for (const submissionId of team.submissionIds ??= [])
+						submissions.push(await transaction.fetch(`/submissions/${submissionId}`));
+					const _challengeIds = new Set();
+					for (const submission of submissions)
+						for (const challengeId of submission.challengeIds)
+							_challengeIds.add(challengeId)
+					const challenges = [];
+					for (const challengeId of _challengeIds)
+						challenges.push(await transaction.fetch(`/challenges/${challengeId}`));
+					// calculate stats
+					let points = 0;
+					for (const challenge of challenges)
+						points += challenge.points;
+					teamPoints.set(team.id, points);
+				}
+				// get top teams
+				const topTeams = teams.slice();
+				topTeams.sort((a, b) => teamPoints.get(b.id) - teamPoints.get(a.id));
+				topTeams.splice(5, topTeams.length);
+				// update leaderboards
+				leaderboard.topTeamIds = topTeams.map(t => t.id);
+				leaderboard.topTeamPoints = topTeams.map(t => teamPoints.get(t.id));
+				leaderboard.lastUpdatedTimestamp = Date.now();
+				// commit
+				await transaction.commit();
+			}
+			// complete
+			leaderboard = await resources.fetch(`/leaderboard`);
+			const teamLines = [];
+			for (let i = 0; i < leaderboard.topTeamIds.length; i++) {
+				const team = await fetchTeam(resources, leaderboard.topTeamIds[i]);
+				const points = leaderboard.topTeamPoints[i];
+				teamLines.push(` - Team ${team.name} (points: ${points}, id: ${team.id})`);
+			}
+			await interaction.reply({
+				ephemeral,
+				content: (
+					`Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)\n`
+					+ teamLines.map(s => `${s}\n`).join("")
+				),
+			});
+			return;
+		}
+
+		if (interaction.commandName === "team-profile") {
+			const teamResolvable = interaction.options.getString("team") || undefined;
+			console.log([ "team-profile", teamResolvable, metadata ]);
+			// get team from team-name or from caller's team if not specified
+			let team = undefined;
+			if (teamResolvable) {
+				// fail if team couldn't be resolved
+				team = await fetchTeam(resources, teamResolvable);
+				if (!team || team.name == null) {
+					const teamByName = await findTeam(resources, { name: teamResolvable });
+					if (!teamByName)
+						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
+					team = teamByName;
+				}
+				// fail if team isn't on leaderboard and isn't the user's team
+				const leaderboard = await resources.fetch(`/leaderboard`);
+				if (!(leaderboard.topTeamIds ?? []).includes(team.id)) {
+					const user = await findUser(resources, { discordUserId: interaction.user.id });
+					if (user && user.teamId !== team.id)
+						throw new InteractionError(`Team ${team.name} (id: ${team.id}) is not on the leaderboard`);
+				}
+			} else {
+				// fail if user doesn't exist or doesn't have a team
+				const user = await findUser(resources, { discordUserId: interaction.user.id });
+				if (!user || user.teamId == null)
+					throw new InteractionError(`You are not in a team`);
+				team = await fetchTeam(resources, user.teamId);
+			}
+			// get linked stuff
+			const submissions = [];
+			for (const submissionId of team.submissionIds ??= [])
+				submissions.push(await resources.fetch(`/submissions/${submissionId}`));
+			const _challengeIds = new Set();
+			for (const submission of submissions)
+				for (const challengeId of submission.challengeIds)
+					_challengeIds.add(challengeId)
+			const challenges = [];
+			for (const challengeId of _challengeIds)
+				challenges.push(await resources.fetch(`/challenges/${challengeId}`));
+			// calculate stats
+			let points = 0;
+			for (const challenge of challenges)
+				points += challenge.points;
+			// complete
+			await interaction.reply({
+				ephemeral,
+				content: (
+					`Team ${team.name} (id: ${team.id})\n`
+					+ ` - Points: ${points}\n`
+					+ ` - Challenges: ${challenges.length}\n`
+					+ ` - Submissions: ${submissions.length}\n`
+				),
+			});
+			return;
+		}
 
 		// fallback when command aint implemented
 		console.log(`not implemented: ${interaction.commandName}`);
