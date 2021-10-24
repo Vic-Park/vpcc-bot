@@ -286,7 +286,7 @@ async function createTeam(guild: Guild, transaction: Fetchable, { id, ...propert
 		&& channel.name.toLowerCase() === "team"
 	)) as CategoryChannel | undefined;
 	if (teamCategory == null)
-		throw Error("team category not found");
+		throw new Error("team category not found");
 	const channelOptions = {
 		parent: teamCategory,
 		permissionOverwrites: [
@@ -885,7 +885,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// generate a random team name that doesn't exist
 				const teamName = `${Math.floor(Math.random() * 2000)}`
 				if (await findTeam(transaction, { name: teamName }) != null)
-					throw Error("lol just try again pls: team name collided");
+					throw new Error("lol just try again pls: team name collided");
 				const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
 				// fail if the other dude made a team already
 				if (otherUser.teamId != null)
@@ -1123,7 +1123,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const teamName = `${Math.floor(Math.random() * 2000)}`
 				// fail if another team with same name exists
 				if (await findTeam(transaction, { name: teamName }) != null)
-					throw Error("lol just try again pls: team name collided");
+					throw new Error("lol just try again pls: team name collided");
 				// fail if team mates aren't unique
 				if ((new Set(members.map(member => member.id))).size !== members.length)
 					throw new InteractionError(`A member was repeated in the command`);
@@ -2128,7 +2128,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					// generate a random team name that doesn't exist
 					const teamName = `${Math.floor(Math.random() * 2000)}`
 					if (await findTeam(transaction, { name: teamName }) != null)
-						throw Error("lol just try again pls: team name collided");
+						throw new Error("lol just try again pls: team name collided");
 					const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
 					// fail if the other dude made a team already
 					if (otherUser.teamId == null) {
