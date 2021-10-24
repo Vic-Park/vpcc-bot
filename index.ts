@@ -455,23 +455,11 @@ function createTeamInvitationOptions(
 			{ "Waiting": waiting, "Accepted": accepted, "Declined": declined },
 		),
 		components: [
-			new MessageActionRow().addComponents(
-				new MessageButton()
-					.setCustomId("accept")
-					.setLabel("Accept")
-					.setStyle("SUCCESS")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("decline")
-					.setLabel("Decline")
-					.setStyle("DANGER")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("cancel")
-					.setLabel("Cancel")
-					.setStyle("SECONDARY")
-					.setDisabled(disabled),
-			),
+			new MessageActionRow({ components: [
+				new MessageButton({ customId: "accept", label: "Accept", style: "SUCCESS", disabled }),
+				new MessageButton({ customId: "decline", label: "Decline", style: "DANGER", disabled }),
+				new MessageButton({ customId: "cancel", label: "Cancel", style: "SECONDARY", disabled }),
+			] }),
 		],
 	};
 }
@@ -490,23 +478,11 @@ function createTeamJoinRequestOptions(
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
-			new MessageActionRow().addComponents(
-				new MessageButton()
-					.setCustomId("approve")
-					.setLabel("Approve")
-					.setStyle("SUCCESS")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("reject")
-					.setLabel("Reject")
-					.setStyle("DANGER")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("cancel")
-					.setLabel("Cancel")
-					.setStyle("SECONDARY")
-					.setDisabled(disabled),
-			),
+			new MessageActionRow({ components: [
+				new MessageButton({ customId: "approve", label: "Approve", style: "SUCCESS", disabled }),
+				new MessageButton({ customId: "reject", label: "Reject", style: "DANGER", disabled }),
+				new MessageButton({ customId: "cancel", label: "Cancel", style: "SECONDARY", disabled }),
+			] }),
 		],
 	};
 }
@@ -526,23 +502,11 @@ function createTeamRenameRequestOptions(
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
-			new MessageActionRow().addComponents(
-				new MessageButton()
-					.setCustomId("approve")
-					.setLabel("Approve")
-					.setStyle("SUCCESS")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("reject")
-					.setLabel("Reject")
-					.setStyle("DANGER")
-					.setDisabled(disabled),
-				new MessageButton()
-					.setCustomId("cancel")
-					.setLabel("Cancel")
-					.setStyle("SECONDARY")
-					.setDisabled(disabled),
-			),
+			new MessageActionRow({ components: [
+				new MessageButton({ customId: "approve", label: "Approve", style: "SUCCESS", disabled }),
+				new MessageButton({ customId: "reject", label: "Reject", style: "DANGER", disabled }),
+				new MessageButton({ customId: "cancel", label: "Cancel", style: "SECONDARY", disabled }),
+			] }),
 		],
 	};
 }
@@ -1230,16 +1194,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					ephemeral,
 					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(m => `<@${m.discordUserId}>`).join(", ")}?`,
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId(customIdPrefix + "yes")
-								.setLabel("Confirm")
-								.setStyle("DANGER"),
-							new MessageButton()
-								.setCustomId(customIdPrefix + "no")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
@@ -1379,16 +1337,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						{ "Text Channel": [`<#${workshop.discordTextChannelId}>`], "Voice Channel": [`<#${workshop.discordVoiceChannelId}>`] },
 					),
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId("add")
-								.setLabel(`Get the ${workshopName} role`)
-								.setStyle("SUCCESS"),
-							new MessageButton()
-								.setCustomId("remove")
-								.setLabel(`Leave the ${workshopName} role`)
-								.setStyle("DANGER"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: "add", label: `Get the ${workshopName} role`, style: "SUCCESS" }),
+							new MessageButton({ customId: "remove", label: `Leave the ${workshopName} role`, style: "DANGER" }),
+						] }),
 					]
 				});
 				return;
@@ -1469,16 +1421,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					ephemeral,
 					content: `Just to confirm, are you attempting to destroy workshop ${workshop.name} with code ${workshop.id}`,
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId(customIdPrefix + "yes")
-								.setLabel("Confirm")
-								.setStyle("DANGER"),
-							new MessageButton()
-								.setCustomId(customIdPrefix + "no")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
@@ -1827,16 +1773,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						},
 					),
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId(customIdPrefix + "yes")
-								.setLabel("Confirm")
-								.setStyle("DANGER"),
-							new MessageButton()
-								.setCustomId(customIdPrefix + "no")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				const nextInteraction = await new Promise(resolve => {
@@ -1910,16 +1850,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						},
 					),
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId(customIdPrefix + "yes")
-								.setLabel("Confirm")
-								.setStyle("DANGER"),
-							new MessageButton()
-								.setCustomId(customIdPrefix + "no")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				const nextInteraction = await new Promise(resolve => {
@@ -2105,16 +2039,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					ephemeral,
 					content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMateDiscordIds.map(i => `<@${i}>`).join(", ")}?`,
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId(customIdPrefix + "yes")
-								.setLabel("Confirm")
-								.setStyle("SUCCESS"),
-							new MessageButton()
-								.setCustomId(customIdPrefix + "no")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "SUCCESS" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				// using awaitMessageComponent here because confirming stuff after more then 15 mins is sus
@@ -2288,16 +2216,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const message = await interaction.channel.send({
 					content: `${interaction.user} is looking for a team! Press the button to create a team with them.`,
 					components: [
-						new MessageActionRow().addComponents(
-							new MessageButton()
-								.setCustomId("teamUp")
-								.setLabel("Team Up")
-								.setStyle("SUCCESS"),
-							new MessageButton()
-								.setCustomId("cancel")
-								.setLabel("Cancel")
-								.setStyle("SECONDARY"),
-						),
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: "teamUp", label: "Team Up", style: "SUCCESS" }),
+							new MessageButton({ customId: "cancel", label: "Cancel", style: "SECONDARY" }),
+						] }),
 					],
 				});
 				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
