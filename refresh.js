@@ -136,7 +136,80 @@ const commands = [
 				.setDescription("Channel type")
 				.setRequired(true)
 				.addChoice("voice", "voice")
-				.addChoice("text", "text"))),
+				.addChoice("text", "text")))
+		.addSubcommand(subcommand => subcommand
+			.setName("register-challenge")
+			.setDescription("Creates a challenge")
+			.addStringOption(option => option
+				.setName("name")
+				.setDescription("Challenge name")
+				.setRequired(true))
+			.addNumberOption(option => option
+				.setName("points")
+				.setDescription("Points on completion")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("workshop")
+				.setDescription("Optional associated workshop name or code")
+				.setRequired(false)))
+		.addSubcommand(subcommand => subcommand
+			.setName("give-team")
+			.setDescription("Creates a submission and associates challenges")
+			.addStringOption(option => option
+				.setName("team")
+				.setDescription("Team name or ID")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("challenges")
+				.setDescription("Challenges' names or IDs (comma-separated)")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("content")
+				.setDescription("Optional submission content")
+				.setRequired(false)))
+		.addSubcommand(subcommand => subcommand
+			.setName("give-team-of")
+			.setDescription("Creates a submission and associates challenges")
+			.addUserOption(option => option
+				.setName("member")
+				.setDescription("Team member name or ID")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("challenges")
+				.setDescription("Challenges' names or IDs (comma-separated)")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("content")
+				.setDescription("Optional submission content")
+				.setRequired(false)))
+		.addSubcommand(subcommand => subcommand
+			.setName("get-challenge")
+			.setDescription("Gets information on a challenge")
+			.addStringOption(option => option
+				.setName("challenge")
+				.setDescription("Challenge name or ID")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("get-submission")
+			.setDescription("Gets information on a submission")
+			.addStringOption(option => option
+				.setName("submission-id")
+				.setDescription("Submission ID")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("delete-submission")
+			.setDescription("Deletes a submission")
+			.addStringOption(option => option
+				.setName("submission-id")
+				.setDescription("Submission ID")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("delete-challenge")
+			.setDescription("Deletes a challenge")
+			.addStringOption(option => option
+				.setName("challenge")
+				.setDescription("Challenge name or ID")
+				.setRequired(true))),
 	new SlashCommandBuilder()
 		.setName("profile")
 		.setDescription("Shows a summary of your profile"),

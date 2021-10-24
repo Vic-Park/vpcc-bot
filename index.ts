@@ -175,6 +175,7 @@ type TeamData = {
 	discordVoiceChannelId: string,
 	freeToJoin?: boolean,
 	pointEvents?: Record<string, any>,
+	submissionIds?: string[],
 }
 
 type UserData = {
@@ -1543,6 +1544,375 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// reply to interaction
 				await interaction.channel.send(`Created ${channelType} support channel ${channel}`);
+				return;
+			}
+			if (subcommandName === "register-challenge") {
+				const name = interaction.options.getString("name", true);
+				const points = interaction.options.getNumber("points", true);
+				const workshopResolvable = interaction.options.getString("workshop") || undefined;
+				console.log([ "admin", "register-challenge", name, points, workshopResolvable, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if workshop couldn't be resolved
+				let workshop = undefined;
+				if (workshopResolvable) {
+					workshop = await transaction.fetch(`/challenges/${workshopResolvable}`);
+					if (workshop.id == null) {
+						workshops: {
+							for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
+								workshop = await transaction.fetch(`/workshop/${workshopId}`);
+								if (workshop.name === workshopResolvable)
+									break workshops;
+							}
+							throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
+						}
+					}
+				}
+				// reply to interaction
+				await interaction.reply({ ephemeral, content: `Creating challenge...` });
+				// create challenge
+				const challengeInfo: Record<string, any> = {
+					id: interaction.id,
+					name: name,
+					points: points,
+					judgeDiscordUserId: interaction.user.id,
+					createdTimestamp: Date.now(),
+				};
+				if (workshop)
+					challengeInfo.workshopId = workshop.id
+				((await transaction.fetch(`/challenges`)).ids ??= []).push(challengeInfo.id);
+				if (workshop)
+					(workshop.challengeIds ??= []).push(challengeInfo.id);
+				const challenge = await transaction.fetch(`/challenges/${challengeInfo.id}`);
+				Object.assign(challenge, challengeInfo);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send(
+					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`
+					+ (workshop ? ` for workshop ${workshop.name} (id: ${workshop.id})` : "")
+					+ ` worth ${challengeInfo.points} points`
+				);
+				return;
+			}
+			if (subcommandName === "give-team") {
+				const teamResolvable = interaction.options.getString("team", true);
+				const challengeResolvables = interaction.options.getString("challenges", true).split(",").map(s => s.trim());
+				const content = interaction.options.getString("content") || undefined;
+				console.log([ "admin", "give-team", teamResolvable, challengeResolvables, content, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if team couldn't be resolved
+				let team = await fetchTeam(transaction, teamResolvable);
+				if (!team || team.name == null) {
+					const teamByName = await findTeam(transaction, { name: teamResolvable });
+					if (!teamByName)
+						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
+					team = teamByName;
+				}
+				// fail if any challenge couldn't be resolved
+				const challenges = [];
+				for (const challengeResolvable of challengeResolvables) {
+					let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
+					if (challenge.id == null) {
+						challenges: {
+							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
+								challenge = await transaction.fetch(`/challenges/${challengeId}`);
+								if (challenge.name === challengeResolvable)
+									break challenges;
+							}
+							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
+						}
+					}
+					challenges.push(challenge);
+				}
+				// reply to interaction
+				await interaction.reply({ ephemeral, content: `Creating submission to challenge and applying to team...` });
+				// create submission
+				const submissionInfo: Record<string, any> = {
+					id: interaction.id,
+					teamId: team.id,
+					challengeIds: challenges.map(c => c.id),
+					judgeDiscordUserId: interaction.user.id,
+					judgedTimestamp: Date.now(),
+				};
+				if (content)
+					submissionInfo.content = content;
+				((await transaction.fetch(`/submissions`)).ids ??= []).push(submissionInfo.id);
+				for (const challenge of challenges)
+					(challenge.submissionIds ??= []).push(submissionInfo.id);
+				(team.submissionIds ??= []).push(submissionInfo.id);
+				const submission = await transaction.fetch(`/submissions/${submissionInfo.id}`);
+				Object.assign(submission, submissionInfo);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send(
+					`Created submission (id: ${submissionInfo.id})`
+					+ ` to challenge ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
+					+ ` for team ${team.name} (id: ${team.id})`
+					+ ` worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+				);
+				return;
+			}
+			if (subcommandName === "give-team-of") {
+				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
+				const challengeResolvables = interaction.options.getString("challenges", true).split(",").map(s => s.trim());
+				const content = interaction.options.getString("content") || undefined;
+				console.log([ "admin", "give-team-of", `${member.user.username}#${member.user.discriminator}`, challengeResolvables, content, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if user doesnt exist or doesnt have a previous team
+				const user = await findUser(transaction, { discordUserId: member.id });
+				if (!user || user.teamId == null) {
+					throw new InteractionError(`User is not in a team`);
+				}
+				// fail if any challenge couldn't be resolved
+				const challenges = [];
+				for (const challengeResolvable of challengeResolvables) {
+					let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
+					if (challenge.id == null) {
+						challenges: {
+							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
+								challenge = await transaction.fetch(`/challenges/${challengeId}`);
+								if (challenge.name === challengeResolvable)
+									break challenges;
+							}
+							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
+						}
+					}
+					challenges.push(challenge);
+				}
+				// reply to interaction
+				await interaction.reply({ ephemeral, content: `Creating submission to challenge and applying to team of member...` });
+				// get team
+				const team = await fetchTeam(transaction, user.teamId);
+				// create submission
+				const submissionInfo: Record<string, any> = {
+					id: interaction.id,
+					teamId: team.id,
+					memberId: user.id,
+					challengeIds: challenges.map(c => c.id),
+					judgeDiscordUserId: interaction.user.id,
+					judgedTimestamp: Date.now(),
+				};
+				if (content)
+					submissionInfo.content = content;
+				((await transaction.fetch(`/submissions`)).ids ??= []).push(submissionInfo.id);
+				for (const challenge of challenges)
+					(challenge.submissionIds ??= []).push(submissionInfo.id);
+				(team.submissionIds ??= []).push(submissionInfo.id);
+				const submission = await transaction.fetch(`/submissions/${submissionInfo.id}`);
+				Object.assign(submission, submissionInfo);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send({
+					allowedMentions: { parse: [] },
+					content: (
+						`Created submission (id: ${submissionInfo.id})`
+						+ ` to challenges ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
+						+ ` for team of <@${user.discordUserId}> (id: ${user.id})`
+						+ ` - team ${team.name} (id: ${team.id})`
+						+ ` - worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+					),
+				});
+				return;
+			}
+			if (subcommandName === "get-submission") {
+				const submissionId = interaction.options.getString("submission-id", true);
+				console.log([ "admin", "get-submission", submissionId, metadata ]);
+				// fail if submission doesn't exist
+				let submission = await resources.fetch(`/submissions/${submissionId}`);
+				if (submission.id == null)
+					throw new InteractionError(`Could not find submission with id: ${submissionId}`);
+				// get linked stuff
+				const team = await fetchTeam(resources, submission.teamId);
+				const user = submission.memberId ? await fetchUser(resources, submission.memberId) : undefined;
+				const challenges = [];
+				for (const challengeId of submission.challengeIds)
+					challenges.push(await resources.fetch(`/challenges/${challengeId}`));
+				// complete
+				await interaction.reply({
+					ephemeral,
+					content: (
+						`Submission (id: ${submission.id}):\n`
+						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
+						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
+						+ ` - Team: ${team.name} (id: ${team.id})\n`
+						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
+						+ (submission.content ? ` - Content: ${submission.content}):\n` : "")
+					),
+				});
+				return;
+			}
+			if (subcommandName === "get-challenge") {
+				const challengeResolvable = interaction.options.getString("challenge", true);
+				console.log([ "admin", "get-challenge", challengeResolvable, metadata ]);
+				// fail if challenge couldn't be resolved
+				let challenge = await resources.fetch(`/challenges/${challengeResolvable}`);
+				if (challenge.id == null) {
+					challenges: {
+						for (const challengeId of (await resources.fetch(`/challenges`)).ids ??= []) {
+							challenge = await resources.fetch(`/challenges/${challengeId}`);
+							if (challenge.name === challengeResolvable)
+								break challenges;
+						}
+						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
+					}
+				}
+				// get linked stuff
+				const workshop = challenge.workshopId ? await resources.fetch(`/workshop/${challenge.workshopId}`) : undefined;
+				// complete
+				await interaction.reply({
+					ephemeral,
+					content: (
+						`Challenge ${challenge.name} (id: ${challenge.id})\n`
+						+ (workshop ? `- Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
+						+ `- Points: ${challenge.points}\n`
+						+ `- Submission IDs: ${challenge.submissionIds.join(", ")}\n`
+					),
+				});
+				return;
+			}
+			if (subcommandName === "delete-submission") {
+				const submissionId = interaction.options.getString("submission-id", true);
+				console.log([ "admin", "delete-submission", submissionId, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if submission doesn't exist
+				let submission = await transaction.fetch(`/submissions/${submissionId}`);
+				if (submission.id == null)
+					throw new InteractionError(`Could not find submission with id: ${submissionId}`);
+				// confirmation
+				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
+				await interaction.reply({
+					ephemeral,
+					content: (
+						`Just to confirm, are you attempting to`
+						+ ` destroy submission (id: ${submission.id}, content: ${submission.content ?? "*none*"})`
+					),
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId(customIdPrefix + "yes")
+								.setLabel("Confirm")
+								.setStyle("DANGER"),
+							new MessageButton()
+								.setCustomId(customIdPrefix + "no")
+								.setLabel("Cancel")
+								.setStyle("SECONDARY"),
+						),
+					],
+				});
+				const nextInteraction = await new Promise(resolve => {
+					assert(interaction.channel);
+					const collector = interaction.channel.createMessageComponentCollector({
+						filter: i => i.customId.startsWith(customIdPrefix) && i.user.id === interaction.user.id,
+						time: 10_000,
+						max: 1,
+					});
+					collector.on("end", collected => resolve(collected.first()));
+				}) as MessageComponentInteraction | undefined;
+				if (!nextInteraction)
+					throw new InteractionError(`Confirmation timed out`);
+				if (nextInteraction.customId.endsWith("no"))
+					throw new InteractionError(`Cancelled challenge destruction`);
+				// reply to interaction
+				await interaction.followUp({ ephemeral, content: `Removing submission...` });
+				// get team / challenge
+				const team = await fetchTeam(transaction, submission.teamId);
+				const user = submission.memberId ? await fetchUser(transaction, submission.memberId) : undefined;
+				const challenges = [];
+				for (const challengeId of submission.challengeIds)
+					challenges.push(await transaction.fetch(`/challenges/${challengeId}`));
+				// remove submission
+				removeFromArray((await transaction.fetch(`/submissions`)).ids ??= [], submission.id);
+				for (const challenge of challenges)
+					removeFromArray(challenge.submissionIds ??= [], submission.id);
+				removeFromArray(team.submissionIds ??= [], submission.id);
+				const submissionInfo = Object.assign({}, submission);
+				clearObject(submission);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send({
+					allowedMentions: { parse: [] },
+					content: (
+						`Removed submission (id: ${submissionInfo.id})`
+						+ ` to challenges ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
+						+ ` from team ${team.name} (id: ${team.id})`
+						+ (user ? ` of <@${user.discordUserId}> (id: ${user.id})` : "")
+						+ ` worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+					),
+				});
+				return;
+			}
+			if (subcommandName === "delete-challenge") {
+				const challengeResolvable = interaction.options.getString("challenge", true);
+				console.log([ "admin", "delete-challenge", challengeResolvable, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if challenge couldn't be resolved
+				let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
+				if (challenge.id == null) {
+					challenges: {
+						for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
+							challenge = await transaction.fetch(`/challenges/${challengeId}`);
+							if (challenge.name === challengeResolvable)
+								break challenges;
+						}
+						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
+					}
+				}
+				// prevent deletion of challenges with submissions
+				if ((challenge.submissionIds ?? []).length > 0)
+					throw new InteractionError(`Challenge ${challenge.name} (id: ${challenge.id}) has ${challenge.submissionIds.length} submissions :/`);
+				// confirmation
+				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
+				await interaction.reply({
+					ephemeral,
+					content: (
+						`Just to confirm, are you attempting to`
+						+ ` destroy challenge ${challenge.name} (id: ${challenge.id})`
+					),
+					components: [
+						new MessageActionRow().addComponents(
+							new MessageButton()
+								.setCustomId(customIdPrefix + "yes")
+								.setLabel("Confirm")
+								.setStyle("DANGER"),
+							new MessageButton()
+								.setCustomId(customIdPrefix + "no")
+								.setLabel("Cancel")
+								.setStyle("SECONDARY"),
+						),
+					],
+				});
+				const nextInteraction = await new Promise(resolve => {
+					assert(interaction.channel);
+					const collector = interaction.channel.createMessageComponentCollector({
+						filter: i => i.customId.startsWith(customIdPrefix) && i.user.id === interaction.user.id,
+						time: 10_000,
+						max: 1,
+					});
+					collector.on("end", collected => resolve(collected.first()));
+				}) as MessageComponentInteraction | undefined;
+				if (!nextInteraction)
+					throw new InteractionError(`Confirmation timed out`);
+				if (nextInteraction.customId.endsWith("no"))
+					throw new InteractionError(`Cancelled challenge destruction`);
+				// reply to interaction
+				await interaction.followUp({ ephemeral, content: `Removing challenge...` });
+				// get workshop
+				const workshop = challenge.workshopId ? await transaction.fetch(`/workshop/${challenge.workshopId}`) : undefined;
+				// remove submission
+				removeFromArray((await transaction.fetch(`/challenges`)).ids ??= [], challenge.id);
+				if (workshop)
+					removeFromArray(workshop.challengeIds ??= [], challenge.id);
+				const challengeInfo = Object.assign({}, challenge);
+				clearObject(challenge);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send({
+					allowedMentions: { parse: [] },
+					content: (
+						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`
+						+ (workshop ? ` from workshop ${workshop.name} (id: ${workshop.id})` : "")
+						+ ` worth ${challengeInfo.points} points`
+					),
+				});
 				return;
 			}
 		}
