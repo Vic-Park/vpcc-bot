@@ -2383,9 +2383,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		let content: string;
 		if (!(e instanceof InteractionError)) {
 			console.error(e);
-			content = `Oops, an internal error occurred: ${e}`;
+			content = `Oops... Internal Error: ${e}`;
 		} else {
-			content = e.message;
+			content = `Oops... ${e.message}`;
 		}
 		try {
 			if (!interaction.replied) {
