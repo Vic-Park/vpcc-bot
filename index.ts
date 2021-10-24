@@ -1217,11 +1217,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 							new MessageButton()
 								.setCustomId(customIdPrefix + "yes")
 								.setLabel("Confirm")
-								.setStyle("SUCCESS"),
+								.setStyle("DANGER"),
 							new MessageButton()
 								.setCustomId(customIdPrefix + "no")
 								.setLabel("Cancel")
-								.setStyle("DANGER"),
+								.setStyle("SECONDARY"),
 						),
 					],
 				});
@@ -1457,11 +1457,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 							new MessageButton()
 								.setCustomId(customIdPrefix + "yes")
 								.setLabel("Confirm")
-								.setStyle("SUCCESS"),
+								.setStyle("DANGER"),
 							new MessageButton()
 								.setCustomId(customIdPrefix + "no")
 								.setLabel("Cancel")
-								.setStyle("DANGER"),
+								.setStyle("SECONDARY"),
 						),
 					],
 				});
@@ -1701,7 +1701,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 							new MessageButton()
 								.setCustomId(customIdPrefix + "no")
 								.setLabel("Cancel")
-								.setStyle("DANGER"),
+								.setStyle("SECONDARY"),
 						),
 					],
 				});
