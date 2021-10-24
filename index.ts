@@ -431,14 +431,14 @@ client.once("ready", async () => {
 	}
 });
 
-function createInfoContent(title: string, description: string, info: Record<string, string[] | undefined>): string {
-	return (
+function createInfoOptions(title: string, description: string, info: Record<string, string[] | undefined>): Pick<MessageOptions, "content"> {
+	return { content: (
 		title + "\n"
 		+ (description ? description + "\n" : "")
 		+ Object.entries(info)
 			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v.length > 0 ? v.join(", ") : "*empty*"}\n`)
 			.join("")
-	);
+	) };
 }
 
 function createTeamInvitationOptions(
@@ -450,7 +450,7 @@ function createTeamInvitationOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: createInfoContent(
+		...createInfoOptions(
 			`${caller} is inviting people to join Team ${teamName}`, "",
 			{ "Waiting": waiting, "Accepted": accepted, "Declined": declined },
 		),
@@ -473,7 +473,7 @@ function createTeamJoinRequestOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: createInfoContent(
+		...createInfoOptions(
 			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`, "",
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
@@ -497,7 +497,7 @@ function createTeamRenameRequestOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: createInfoContent(
+		...createInfoOptions(
 			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`, "",
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
@@ -1331,7 +1331,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Created workshop` });
 				await message.edit({
-					content: createInfoContent(
+					...createInfoOptions(
 						`New ${workshopName} workshop by ${interaction.user}!`,
 						`Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`,
 						{ "Text Channel": [`<#${workshop.discordTextChannelId}>`], "Voice Channel": [`<#${workshop.discordVoiceChannelId}>`] },
@@ -1547,7 +1547,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				Object.assign(challenge, challengeInfo);
 				// commit and complete
 				await transaction.commit();
-				await interaction.channel.send(createInfoContent(
+				await interaction.channel.send(createInfoOptions(
 					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`, "",
 					{
 						"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
@@ -1610,7 +1610,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				Object.assign(submission, submissionInfo);
 				// commit and complete
 				await transaction.commit();
-				await interaction.channel.send(createInfoContent(
+				await interaction.channel.send(createInfoOptions(
 					`Created submission (id: ${submissionInfo.id})`, "",
 					{
 						"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
@@ -1672,7 +1672,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: createInfoContent(
+					...createInfoOptions(
 						`Created submission (id: ${submissionInfo.id})`, "",
 						{
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
@@ -1700,7 +1700,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// complete
 				await interaction.reply({
 					ephemeral,
-					content: createInfoContent(
+					...createInfoOptions(
 						`Submission (id: ${submission.id})`, "",
 						{
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
@@ -1733,7 +1733,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// complete
 				await interaction.reply({
 					ephemeral,
-					content: createInfoContent(
+					...createInfoOptions(
 						`Challenge ${challenge.name} (id: ${challenge.id})`, "",
 						{
 							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
@@ -1762,7 +1762,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: createInfoContent(
+					...createInfoOptions(
 						`Just to confirm, are you attempting to destroy submission (id: ${submission.id})`, "",
 						{
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
@@ -1805,7 +1805,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: createInfoContent(
+					...createInfoOptions(
 						`Removed submission (id: ${submissionInfo.id})`, "",
 						{
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
@@ -1842,7 +1842,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: createInfoContent(
+					...createInfoOptions(
 						`Just to confirm, are you attempting to destroy challenge ${challenge.name} (id: ${challenge.id})`, "",
 						{
 							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
@@ -1881,7 +1881,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: createInfoContent(
+					...createInfoOptions(
 						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`, "",
 						{
 							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
@@ -2359,7 +2359,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			// complete
 			await interaction.reply({
 				ephemeral,
-				content: createInfoContent(
+				...createInfoOptions(
 					`Team ${team.name} (id: ${team.id})`, "",
 					{
 						"Points": [`${points}`],
