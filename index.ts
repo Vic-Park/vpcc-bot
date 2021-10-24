@@ -431,9 +431,10 @@ client.once("ready", async () => {
 	}
 });
 
-function createInfoContent(title: string, info: Record<string, string[]>): string {
+function createInfoContent(title: string, description: string, info: Record<string, string[] | undefined>): string {
 	return (
 		title + "\n"
+		+ (description ? description + "\n" : "")
 		+ Object.entries(info)
 			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v ? v.join(", ") : "*empty*"}\n`)
 			.join("")
@@ -450,7 +451,7 @@ function createTeamInvitationOptions(
 ): MessageOptions {
 	return {
 		content: createInfoContent(
-			`${caller} is inviting people to join Team ${teamName}`,
+			`${caller} is inviting people to join Team ${teamName}`, "",
 			{ "Waiting": waiting, "Accepted": accepted, "Declined": declined },
 		),
 		components: [
@@ -485,7 +486,7 @@ function createTeamJoinRequestOptions(
 ): MessageOptions {
 	return {
 		content: createInfoContent(
-			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`,
+			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`, "",
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
@@ -521,7 +522,7 @@ function createTeamRenameRequestOptions(
 ): MessageOptions {
 	return {
 		content: createInfoContent(
-			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`,
+			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`, "",
 			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
