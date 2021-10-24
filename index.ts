@@ -1378,6 +1378,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
 				if (workshop.id == null)
 					throw new InteractionError(`Workshop does not exist`);
+				// prevent deletion of workshops with challenges
+				if ((workshop.challengeIds ?? []).length > 0)
+					throw new InteractionError(`Workshop ${workshop.name} (code: ${workshop.id}) has ${workshop.challengeIds.length} challenges :/`);
 				// confirmation
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
