@@ -268,7 +268,7 @@ class InteractionError extends Error {
 	}
 }
 
-async function createTeam(guild: Guild, transaction: Fetchable, { id, ...properties }: Omit<TeamData, "memberIds" | "discordRoleId" | "discordTextChannelId" | "discordVoiceChannelId">): Promise<TeamData> {
+async function createTeam(guild: Guild, transaction: Fetchable, { id, ...properties }: Pick<TeamData, "id" | "name" | "freeToJoin">): Promise<TeamData> {
 	const teams = await fetchTeams(transaction);
 	const team = await fetchTeam(transaction, id);
 	// create team with properties
