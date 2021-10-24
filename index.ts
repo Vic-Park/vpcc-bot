@@ -600,9 +600,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						id: info.futureTeamId,
 						name: info.futureTeamName,
 					});
-					for (const userId of [ info.caller, ...info.accepted ]) {
+					for (const userId of [ info.caller, ...info.accepted ])
 						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, userId));
-					}
 					if (info.waiting.length === 0) {
 						const options = await createTeamInvitationOptionsFromInfo(info, true);
 						removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -692,9 +691,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			// ensure caller
 			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
-			if (callerUser == null) {
+			if (callerUser == null)
 				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
-			}
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id))
 					throw new InteractionError(`You cannot approve this join request again`);
@@ -793,9 +791,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			// ensure caller
 			let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
-			if (callerUser == null) {
+			if (callerUser == null)
 				callerUser = await createUser(interaction.guild, transaction, { id: `${interaction.id}${interaction.user.id}`, discordUserId: interaction.user.id });
-			}
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id)
 					throw new InteractionError(`You cannot approve your own rename request`);
