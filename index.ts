@@ -1555,7 +1555,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if workshop couldn't be resolved
 				let workshop = undefined;
 				if (workshopResolvable) {
-					workshop = await transaction.fetch(`/challenges/${workshopResolvable}`);
+					workshop = await transaction.fetch(`/workshop/${workshopResolvable}`);
 					if (workshop.id == null) {
 						workshops: {
 							for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
@@ -1578,7 +1578,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					createdTimestamp: Date.now(),
 				};
 				if (workshop)
-					challengeInfo.workshopId = workshop.id
+					challengeInfo.workshopId = workshop.id;
 				((await transaction.fetch(`/challenges`)).ids ??= []).push(challengeInfo.id);
 				if (workshop)
 					(workshop.challengeIds ??= []).push(challengeInfo.id);
@@ -1764,7 +1764,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						`Challenge ${challenge.name} (id: ${challenge.id})\n`
 						+ (workshop ? `- Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
 						+ `- Points: ${challenge.points}\n`
-						+ `- Submission IDs: ${challenge.submissionIds.join(", ")}\n`
+						+ `- Submission IDs: ${(challenge.submissionIds ?? []).join(", ")}\n`
 					),
 				});
 				return;
