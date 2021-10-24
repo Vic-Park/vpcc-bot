@@ -438,7 +438,7 @@ function createInfoOptions({ title, description = undefined, info }: {
 		title + "\n"
 		+ (description ? description + "\n" : "")
 		+ Object.entries(info)
-			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v.length > 0 ? v.join(", ") : "*empty*"}\n`)
+			.map(([ k, v ]) => v == null ? "" : ` - ${k}: ${v.length > 0 ? v.join(", ") : "*empty*"}\n`)
 			.join("")
 	) };
 }
@@ -600,7 +600,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						id: info.futureTeamId,
 						name: info.futureTeamName,
 					});
-					for (const userId of [info.caller, ...info.accepted]) {
+					for (const userId of [ info.caller, ...info.accepted ]) {
 						await joinTeam(interaction.guild, transaction, team, await fetchUser(transaction, userId));
 					}
 					if (info.waiting.length === 0) {
@@ -983,24 +983,24 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		}
 
 		if (interaction.commandName === "admin") {
-			if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["supervisor", "leader"].includes(role.name.toLowerCase())))
+			if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => [ "supervisor", "leader" ].includes(role.name.toLowerCase())))
 				throw new InteractionError(`You are not an admin`);
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
 				await interaction.reply({ ephemeral, content: "*getting*" });
 				const key = interaction.options.getString("key", true);
 				console.log([ "admin", "get", key, metadata ]);
-				const [resource, ...properties] = key.split(".");
+				const [ resource, ...properties ] = key.split(".");
 				let result = await resources.fetch(resource.trim());
 				for (const property of properties)
 					result = result?.[property.trim()];
 				let out;
 				if (result === undefined)
-					out = ["*undefined*"];
+					out = [ "*undefined*" ];
 				else {
 					const stringified = JSON.stringify(result, null, 2);
 					if (!stringified.includes("\n"))
-						out = ["`" + stringified + "`"];
+						out = [ "`" + stringified + "`" ];
 					else {
 						out = [];
 						let current = [];
@@ -1023,14 +1023,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "set") {
-				if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase())))
+				if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => [ "bot maintainer" ].includes(role.name.toLowerCase())))
 					throw new InteractionError(`You are not a bot maintainer`);
 				await interaction.reply({ ephemeral, content: "*updating*" });
 				const key = interaction.options.getString("key", true);
 				const value = interaction.options.getString("value", true);
 				console.log([ "admin", "set", key, value, metadata ]);
 				const transaction = createTransaction(resources);
-				const [resource, ...properties] = key.split(".");
+				const [ resource, ...properties ] = key.split(".");
 				const last = properties.pop();
 				let result = await transaction.fetch(resource.trim());
 				for (const property of properties)
@@ -1112,7 +1112,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
 				const member2 = interaction.options.getUser("member2", false);
 				const member3 = interaction.options.getUser("member3", false);
-				const members = [member0, member1];
+				const members = [ member0, member1 ];
 				if (member2 != null)
 					members.push(await interaction.guild.members.fetch(member2));
 				if (member3 != null)
@@ -1227,7 +1227,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// move everyone in a workshop to their respective teams if they have one
 				const channel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
 				assert(channel);
-				for (const [memberId, member] of channel.members.entries()) {
+				for (const [ memberId, member ] of channel.members.entries()) {
 					let user = await findUser(transaction, { discordUserId: memberId });
 					if (user == null) continue;
 					if (user.teamId == null) continue;
@@ -1299,7 +1299,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `New ${workshopName} workshop by ${interaction.user}!`,
 						description: `Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`,
-						info: { "Text Channel": [`<#${workshop.discordTextChannelId}>`], "Voice Channel": [`<#${workshop.discordVoiceChannelId}>`] },
+						info: { "Text Channel": [ `<#${workshop.discordTextChannelId}>` ], "Voice Channel": [ `<#${workshop.discordVoiceChannelId}>` ] },
 					}),
 					components: [
 						new MessageActionRow({ components: [
@@ -1509,8 +1509,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send(createInfoOptions({
 					title: `Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`,
 					info: {
-						"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
-						"Points": [`${challengeInfo.points}`],
+						"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+						"Points": [ `${challengeInfo.points}` ],
 					},
 				}));
 				return;
@@ -1573,8 +1573,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					title: `Created submission (id: ${submissionInfo.id})`,
 					info: {
 						"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
-						"Team": [`${team.name} (id: ${team.id})`],
-						"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+						"Team": [ `${team.name} (id: ${team.id})` ],
+						"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
 					},
 				}));
 				return;
@@ -1634,9 +1634,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						title: `Created submission (id: ${submissionInfo.id})`,
 						info: {
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
-							"Member": [`<@${user.discordUserId}> (id: ${user.id})`],
-							"Team": [`${team.name} (id: ${team.id})`],
-							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+							"Member": [ `<@${user.discordUserId}> (id: ${user.id})`] ,
+							"Team": [ `${team.name} (id: ${team.id})` ],
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
 						},
 					}),
 				});
@@ -1662,10 +1662,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						title: `Submission (id: ${submission.id})`,
 						info: {
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
-							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
-							"Team": [`${team.name} (id: ${team.id})`],
-							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
-							"Content": submission.content && [submission.content],
+							"Member": user && [ `<@${user.discordUserId}> (id: ${user.id})` ],
+							"Team": [ `${team.name} (id: ${team.id})` ],
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
+							"Content": submission.content && [ submission.content ],
 						},
 					}),
 				});
@@ -1694,8 +1694,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Challenge ${challenge.name} (id: ${challenge.id})`,
 						info: {
-							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
-							"Points": [`${challenge.points}`],
+							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Points": [ `${challenge.points}` ],
 							"Submission IDs": (challenge.submissionIds ?? []),
 						},
 					}),
@@ -1724,10 +1724,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						title: `Just to confirm, are you attempting to destroy submission (id: ${submission.id})`,
 						info: {
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
-							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
-							"Team": [`${team.name} (id: ${team.id})`],
-							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
-							"Content": submission.content && [submission.content],
+							"Member": user && [ `<@${user.discordUserId}> (id: ${user.id})` ],
+							"Team": [ `${team.name} (id: ${team.id})` ],
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
+							"Content": submission.content && [ submission.content ],
 						},
 					}),
 					components: [
@@ -1767,9 +1767,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						title: `Removed submission (id: ${submissionInfo.id})`,
 						info: {
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
-							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
-							"Team": [`${team.name} (id: ${team.id})`],
-							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+							"Member": user && [ `<@${user.discordUserId}> (id: ${user.id})` ],
+							"Team": [ `${team.name} (id: ${team.id})` ],
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
 						},
 					}),
 				});
@@ -1803,8 +1803,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Just to confirm, are you attempting to destroy challenge ${challenge.name} (id: ${challenge.id})`,
 						info: {
-							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
-							"Points": [`${challenge.points}`],
+							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Points": [ `${challenge.points}` ],
 						},
 					}),
 					components: [
@@ -1842,8 +1842,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`,
 						info: {
-							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
-							"Points": [`${challengeInfo.points}`],
+							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Points": [ `${challengeInfo.points}` ],
 						},
 					}),
 				});
@@ -1901,7 +1901,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const member1 = await interaction.guild.members.fetch(interaction.options.getUser("member1", true));
 				const member2 = interaction.options.getUser("member2", false);
 				const member3 = interaction.options.getUser("member3", false);
-				const teamMates = [member1];
+				const teamMates = [ member1 ];
 				if (member2 != null)
 					teamMates.push(await interaction.guild.members.fetch(member2));
 				if (member3 != null)
@@ -2023,7 +2023,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					id: reply.id,
 					type: "teamJoin",
 					teamId: team.id,
-					waiting: [...team.memberIds],
+					waiting: [ ...team.memberIds ],
 					approved: [],
 					rejected: [],
 					caller: callerUser.id,
@@ -2061,7 +2061,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.reply({ ephemeral, content: `Creating request to rename team...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
-				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [`<@${callerUser.discordUserId}>`], [], true));
+				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [ `<@${callerUser.discordUserId}>` ], [], true));
 				// create delayed interaction info
 				const transaction2 = createTransaction(resources);
 				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
@@ -2070,7 +2070,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					id: reply.id,
 					type: "teamRename",
 					teamId: team.id,
-					waiting: removeFromArray([...team.memberIds], callerUser.id),
+					waiting: removeFromArray([ ...team.memberIds ], callerUser.id),
 					approved: [callerUser.id],
 					rejected: [],
 					caller: callerUser.id,
@@ -2078,7 +2078,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction2.commit();
 				// enable the buttons
-				await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [`<@${callerUser.discordUserId}>`], []));
+				await reply.edit(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [ `<@${callerUser.discordUserId}>` ], []));
 				return;
 			}
 			if (subcommandName === "leave") {
@@ -2297,9 +2297,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				...createInfoOptions({
 					title: `Team ${team.name} (id: ${team.id})`,
 					info: {
-						"Points": [`${points}`],
-						"Challenges": [`${challenges.length}`],
-						"Submission": [`${submissions.length}`],
+						"Points": [ `${points}` ],
+						"Challenges": [ `${challenges.length}` ],
+						"Submission": [ `${submissions.length}` ],
 					},
 				}),
 			});
