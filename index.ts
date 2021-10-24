@@ -431,6 +431,15 @@ client.once("ready", async () => {
 	}
 });
 
+function createInfoContent(title: string, info: Record<string, string[]>): string {
+	return (
+		title + "\n"
+		+ Object.entries(info)
+			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v ? v.join(", ") : "*empty*"}\n`)
+			.join("")
+	);
+}
+
 function createTeamInvitationOptions(
 	teamName: string,
 	caller: string,
@@ -440,11 +449,9 @@ function createTeamInvitationOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: (
-			`${caller} is inviting people to join Team ${teamName}\n`
-			+ ` - Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
-			+ ` - Accepted: ${accepted ? accepted.join(", ") : "*empty*"}\n`
-			+ ` - Declined: ${declined ? declined.join(", ") : "*empty*"}\n`
+		content: createInfoContent(
+			`${caller} is inviting people to join Team ${teamName}`,
+			{ "Waiting": waiting, "Accepted": accepted, "Declined": declined },
 		),
 		components: [
 			new MessageActionRow().addComponents(
@@ -477,11 +484,9 @@ function createTeamJoinRequestOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: (
-			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)\n`
-			+ ` - Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
-			+ ` - Approved: ${approved ? approved.join(", ") : "*empty*"}\n`
-			+ ` - Denied: ${rejected ? rejected.join(", ") : "*empty*"}\n`
+		content: createInfoContent(
+			`${caller} wants to join Team ${teamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`,
+			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
 			new MessageActionRow().addComponents(
@@ -515,11 +520,9 @@ function createTeamRenameRequestOptions(
 	disabled: boolean = false,
 ): MessageOptions {
 	return {
-		content: (
-			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)\n`
-			+ ` - Waiting: ${waiting ? waiting.join(", ") : "*empty*"}\n`
-			+ ` - Approved: ${approved ? approved.join(", ") : "*empty*"}\n`
-			+ ` - Denied: ${rejected ? rejected.join(", ") : "*empty*"}\n`
+		content: createInfoContent(
+			`${caller} wants to rename Team ${teamName} to ${newTeamName} (${Math.floor((waiting.length + approved.length + rejected.length) / 2 + 1)} needed for approval)`,
+			{ "Waiting": waiting, "Approved": approved, "Rejected": rejected },
 		),
 		components: [
 			new MessageActionRow().addComponents(
