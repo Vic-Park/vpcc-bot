@@ -1036,9 +1036,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			const subcommandName = interaction.options.getSubcommand(true);
 			if (subcommandName === "get") {
-				if (!(await interaction.guild.members.fetch(interaction.user.id)).roles.cache.find((role: Role) => ["bot maintainer"].includes(role.name.toLowerCase()))) {
-					throw new InteractionError(`You are not a bot maintainer`);
-				}
 				await interaction.reply({ ephemeral, content: "*getting*" });
 				const key = interaction.options.getString("key", true);
 				console.log([ "admin", "get", key, metadata ]);
@@ -1046,17 +1043,32 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let result = await resources.fetch(resource.trim());
 				for (const property of properties)
 					result = result?.[property.trim()];
-				let out: string;
+				let out;
 				if (result === undefined)
-					out = "*undefined*";
+					out = ["*undefined*"];
 				else {
 					const stringified = JSON.stringify(result, null, 2);
-					if (stringified.includes("\n"))
-						out = "```json\n" + stringified + "\n```";
-					else
-						out = "`" + stringified + "`";
+					if (!stringified.includes("\n"))
+						out = ["`" + stringified + "`"];
+					else {
+						out = [];
+						let current = [];
+						let length = 0;
+						for (const line of stringified.split("\n")) {
+							if (8 + 1*(current.length + 1) + (length + line.length) + 3 > 2000) {
+								out.push("```json\n" + current.join("\n") + "```");
+								current = [];
+								length = 0;
+							}
+							current.push(line);
+							length += line.length;
+						}
+						if (current.length > 0)
+							out.push("```json\n" + current.join("\n") + "```");
+					}
 				}
-				await interaction.followUp({ ephemeral, content: out });
+				for (const part of out)
+					await interaction.followUp({ ephemeral, content: part });
 				return;
 			}
 			if (subcommandName === "set") {
