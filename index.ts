@@ -1560,7 +1560,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						workshops: {
 							for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
 								workshop = await transaction.fetch(`/workshop/${workshopId}`);
-								if (workshop.name === workshopResolvable)
+								if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
 									break workshops;
 							}
 							throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
@@ -1600,12 +1600,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "give-team", teamResolvable, challengeResolvables, content, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team couldn't be resolved
-				let team = await fetchTeam(transaction, teamResolvable);
-				if (!team || team.name == null) {
-					const teamByName = await findTeam(transaction, { name: teamResolvable });
-					if (!teamByName)
+				let team = await transaction.fetch(`/team/${teamResolvable}`);
+				if (team.id == null) {
+					teams: {
+						for (const teamId of (await transaction.fetch(`/teams`)).teamIds ??= []) {
+							team = await transaction.fetch(`/team/${teamId}`);
+							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
+								break teams;
+						}
 						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
-					team = teamByName;
+					}
 				}
 				// fail if any challenge couldn't be resolved
 				const challenges = [];
@@ -1615,7 +1619,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						challenges: {
 							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
 								challenge = await transaction.fetch(`/challenges/${challengeId}`);
-								if (challenge.name === challengeResolvable)
+								if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
 									break challenges;
 							}
 							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
@@ -1670,7 +1674,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						challenges: {
 							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
 								challenge = await transaction.fetch(`/challenges/${challengeId}`);
-								if (challenge.name === challengeResolvable)
+								if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
 									break challenges;
 							}
 							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
@@ -1749,7 +1753,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					challenges: {
 						for (const challengeId of (await resources.fetch(`/challenges`)).ids ??= []) {
 							challenge = await resources.fetch(`/challenges/${challengeId}`);
-							if (challenge.name === challengeResolvable)
+							if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
 								break challenges;
 						}
 						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
@@ -1855,7 +1859,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					challenges: {
 						for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
 							challenge = await transaction.fetch(`/challenges/${challengeId}`);
-							if (challenge.name === challengeResolvable)
+							if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
 								break challenges;
 						}
 						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
@@ -2355,12 +2359,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			let team = undefined;
 			if (teamResolvable) {
 				// fail if team couldn't be resolved
-				team = await fetchTeam(resources, teamResolvable);
-				if (!team || team.name == null) {
-					const teamByName = await findTeam(resources, { name: teamResolvable });
-					if (!teamByName)
+				team = await resources.fetch(`/team/${teamResolvable}`);
+				if (team.id == null) {
+					teams: {
+						for (const teamId of (await resources.fetch(`/teams`)).teamIds ??= []) {
+							team = await resources.fetch(`/team/${teamId}`);
+							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
+								break teams;
+						}
 						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
-					team = teamByName;
+					}
 				}
 				// fail if team isn't on leaderboard and isn't the user's team
 				const leaderboard = await resources.fetch(`/leaderboard`);
