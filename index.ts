@@ -436,7 +436,7 @@ function createInfoContent(title: string, description: string, info: Record<stri
 		title + "\n"
 		+ (description ? description + "\n" : "")
 		+ Object.entries(info)
-			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v ? v.join(", ") : "*empty*"}\n`)
+			.map(([k, v]) => v == null ? "" : ` - ${k}: ${v.length > 0 ? v.join(", ") : "*empty*"}\n`)
 			.join("")
 	);
 }
