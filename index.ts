@@ -1777,13 +1777,24 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let submission = await transaction.fetch(`/submissions/${submissionId}`);
 				if (submission.id == null)
 					throw new InteractionError(`Could not find submission with id: ${submissionId}`);
+				// get team / challenge
+				const team = await fetchTeam(transaction, submission.teamId);
+				const user = submission.memberId ? await fetchUser(transaction, submission.memberId) : undefined;
+				const challenges = [];
+				for (const challengeId of submission.challengeIds)
+					challenges.push(await transaction.fetch(`/challenges/${challengeId}`));
 				// confirmation
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
 					content: (
 						`Just to confirm, are you attempting to`
-						+ ` destroy submission (id: ${submission.id}, content: ${submission.content ?? "*none*"})`
+						+ ` destroy submission (id: ${submission.id})\n`
+						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
+						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
+						+ ` - Team: ${team.name} (id: ${team.id})\n`
+						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
+						+ (submission.content ? ` - Content: ${submission.content}\n` : "")
 					),
 					components: [
 						new MessageActionRow().addComponents(
@@ -1813,12 +1824,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Cancelled submission destruction`);
 				// reply to interaction
 				await interaction.followUp({ ephemeral, content: `Removing submission...` });
-				// get team / challenge
-				const team = await fetchTeam(transaction, submission.teamId);
-				const user = submission.memberId ? await fetchUser(transaction, submission.memberId) : undefined;
-				const challenges = [];
-				for (const challengeId of submission.challengeIds)
-					challenges.push(await transaction.fetch(`/challenges/${challengeId}`));
 				// remove submission
 				removeFromArray((await transaction.fetch(`/submissions`)).ids ??= [], submission.id);
 				for (const challenge of challenges)
@@ -1859,13 +1864,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// prevent deletion of challenges with submissions
 				if ((challenge.submissionIds ?? []).length > 0)
 					throw new InteractionError(`Challenge ${challenge.name} (id: ${challenge.id}) has ${challenge.submissionIds.length} submissions :/`);
+				// get workshop
+				const workshop = challenge.workshopId ? await transaction.fetch(`/workshop/${challenge.workshopId}`) : undefined;
 				// confirmation
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
 					content: (
 						`Just to confirm, are you attempting to`
-						+ ` destroy challenge ${challenge.name} (id: ${challenge.id})`
+						+ ` destroy challenge ${challenge.name} (id: ${challenge.id})\n`
+						+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
+						+ ` - Points: ${challenge.points}\n`
 					),
 					components: [
 						new MessageActionRow().addComponents(
@@ -1895,8 +1904,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Cancelled challenge destruction`);
 				// reply to interaction
 				await interaction.followUp({ ephemeral, content: `Removing challenge...` });
-				// get workshop
-				const workshop = challenge.workshopId ? await transaction.fetch(`/workshop/${challenge.workshopId}`) : undefined;
 				// remove submission
 				removeFromArray((await transaction.fetch(`/challenges`)).ids ??= [], challenge.id);
 				if (workshop)
