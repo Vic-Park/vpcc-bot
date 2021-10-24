@@ -197,6 +197,13 @@ const commands = [
 				.setDescription("Submission ID")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
+			.setName("get-workshop")
+			.setDescription("Gets information on a workshop")
+			.addStringOption(option => option
+				.setName("workshop")
+				.setDescription("Workshop name or code")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
 			.setName("delete-submission")
 			.setDescription("Deletes a submission")
 			.addStringOption(option => option

@@ -1705,6 +1705,38 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				return;
 			}
+			if (subcommandName === "get-workshop") {
+				const workshopResolvable = interaction.options.getString("workshop", true);
+				console.log([ "admin", "get-workshop", workshopResolvable, metadata ]);
+				// fail if workshop couldn't be resolved
+				let workshop = await resources.fetch(`/workshop/${workshopResolvable}`);
+				if (workshop.id == null) {
+					workshops: {
+						for (const workshopId of (await resources.fetch(`/workshops`)).ids ??= []) {
+							workshop = await resources.fetch(`/workshop/${workshopId}`);
+							if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
+								break workshops;
+						}
+						throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
+					}
+				}
+				// get linked stuff
+				const challenges = [];
+				for (const challengeId of workshop.challengeIds ?? [])
+					challenges.push(await resources.fetch(`/challenges/${challengeId}`));
+				// complete
+				await interaction.reply({
+					ephemeral,
+					...createInfoOptions({
+						title: `Workshop ${workshop.name} (code: ${workshop.id})`,
+						info: {
+							"Host": [ `<@${workshop.hostDiscordUserId}>` ],
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+						},
+					}),
+				});
+				return;
+			}
 			if (subcommandName === "delete-submission") {
 				const submissionId = interaction.options.getString("submission-id", true);
 				console.log([ "admin", "delete-submission", submissionId, metadata ]);
