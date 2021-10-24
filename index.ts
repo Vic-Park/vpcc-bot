@@ -1173,7 +1173,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: `Just to confirm, are you attempting to destroy team ${team.name} with members ${teamMates.map(m => `<@${m.discordUserId}>`).join(", ")}?`,
+					...createInfoOptions({
+						title: `Just to confirm, are you attempting to destroy team ${team.name}?`,
+						info: { "Members": [ `${teamMates.map(m => `<@${m.discordUserId}>`)}` ] },
+					}),
 					components: [
 						new MessageActionRow({ components: [
 							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
@@ -1392,7 +1395,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: `Just to confirm, are you attempting to destroy workshop ${workshop.name} with code ${workshop.id}`,
+					...createInfoOptions({
+						title: `Just to confirm, are you attempting to destroy workshop ${workshop.name} (code: ${workshop.id})`,
+						info: {
+							"Host": [ `<@${workshop.hostDiscordUserId}>` ],
+							"Challenges": [],
+						},
+					}),
 					components: [
 						new MessageActionRow({ components: [
 							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "DANGER" }),
@@ -2027,7 +2036,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: `Just to confirm, are you attempting to join team ${team.name} with members ${teamMateDiscordIds.map(i => `<@${i}>`).join(", ")}?`,
+					...createInfoOptions({
+						title: `Just to confirm, are you attempting to join team ${team.name}?`,
+						info: { "Members": [ `${teamMateDiscordIds.map(i => `<@${i}>`)}` ] },
+					}),
 					components: [
 						new MessageActionRow({ components: [
 							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "SUCCESS" }),
@@ -2269,20 +2281,20 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			// complete
 			leaderboard = await resources.fetch(`/leaderboard`);
-			const teamLines = [];
+			const info: Record<string, string[]> = {};
 			for (let i = 0; i < leaderboard.topTeamIds.length; i++) {
 				const team = await fetchTeam(resources, leaderboard.topTeamIds[i]);
 				const points = leaderboard.topTeamPoints[i];
-				teamLines.push(` - Team ${team.name} (points: ${points}, id: ${team.id})`);
+				info[`Team ${team.name}`] = [ `${points} points (id: ${team.id})` ];
 			}
-			const content = (
-				`Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)\n`
-				+ teamLines.map(s => `${s}\n`).join("")
-			);
+			const options = createInfoOptions({
+				title: `Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)`,
+				info,
+			});
 			if (updated)
-				await interaction.followUp({ ephemeral, content});
+				await interaction.followUp({ ephemeral, ...options });
 			else
-				await interaction.reply({ ephemeral, content});
+				await interaction.reply({ ephemeral, ...options });
 			return;
 		}
 
