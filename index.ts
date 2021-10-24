@@ -601,17 +601,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "accept") {
 				if (info.caller === callerUser.id) {
-					throw new InteractionError(`You cannot accept own invitation`);
+					throw new InteractionError(`You cannot accept your own invitation`);
 				} else if (info.accepted.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot accept invitation again`);
+					throw new InteractionError(`You cannot accept this invitation again`);
 				} else if (info.declined.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot accept invitation after declining`);
+					throw new InteractionError(`You cannot accept this invitation after declining it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
 					throw new InteractionError(`You weren't invited`);
 				}
 				// fail if caller is already in a team
 				if (callerUser.teamId != null) {
-					throw new InteractionError(`You are on a team`);
+					throw new InteractionError(`You are already on a team`);
 				}
 				if (info.accepted.length === 0) {
 					// fail if another team with same name exists
@@ -666,17 +666,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					}
 					await transaction.commit();
 					await message.edit(await createTeamInvitationOptionsFromInfo(info));
-					await interaction.followUp({ ephemeral, content: `Accepted invitation to ${team.name}` });
+					await interaction.followUp({ ephemeral, content: `Accepted invitation to join team ${team.name}` });
 					return;
 				}
 			}
 			if (interaction.customId === "decline") {
 				if (info.caller === callerUser.id) {
-					throw new InteractionError(`You cannot decline own invitation`);
+					throw new InteractionError(`You cannot decline your own invitation`);
 				} else if (info.declined.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot decline invitation again`);
+					throw new InteractionError(`You cannot decline this invitation again`);
 				} else if (info.accepted.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot decline invitation after accepting`);
+					throw new InteractionError(`You cannot decline this invitation after accepting it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
 					throw new InteractionError(`You weren't invited`);
 				}
@@ -689,17 +689,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					clearObject(info);
 					await transaction.commit();
 					await message.edit(options);
-					await message.reply(`Team ${teamName} will not be created`);
+					await message.reply(`Team ${teamName} won't be created`);
 					return;
 				}
 				await transaction.commit();
 				await message.edit(await createTeamInvitationOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Declined invitation to ${info.futureTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Declined invitation to join team ${info.futureTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					throw new InteractionError(`You aren't inviter`);
+					throw new InteractionError(`You aren't the inviter`);
 				}
 				const teamName = info.futureTeamName;
 				const options = await createTeamInvitationOptionsFromInfo(info, true);
@@ -731,11 +731,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "approve") {
 				if (info.approved.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot approve join request again`);
+					throw new InteractionError(`You cannot approve this join request again`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot approve join request after rejecting`);
+					throw new InteractionError(`You cannot approve this join request after rejecting it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					throw new InteractionError(`You are not in team`);
+					throw new InteractionError(`You are not in this team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
@@ -772,16 +772,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Approved request from <@${requester.discordUserId}> to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Approved request from <@${requester.discordUserId}> to join team ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
 				if (info.rejected.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot reject join request again`);
+					throw new InteractionError(`You cannot reject this join request again`);
 				} else if (info.approved.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot reject join request after approving`);
+					throw new InteractionError(`You cannot reject this join request after approving it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					throw new InteractionError(`You are not in team`);
+					throw new InteractionError(`You are not in this team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
@@ -797,19 +797,20 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamJoinRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Rejected request from <@${callerDiscordUserId}> to ${team.name}` });
+				await interaction.followUp({ ephemeral, content: `Rejected request from <@${callerDiscordUserId}> to join team ${team.name}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					throw new InteractionError(`You aren't join requester`);
+					throw new InteractionError(`You can't cancel someone else's request to join`);
 				}
+				const callerDiscordUserId = (await fetchUser(transaction, info.caller)).discordUserId;
 				const options = await createTeamJoinRequestOptionsFromInfo(info, true);
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
 				clearObject(info);
 				await transaction.commit();
 				await message.edit(options);
-				await interaction.followUp({ ephemeral, content: `Request to join ${team.name} was cancelled` });
+				await message.reply(`<@${callerDiscordUserId}>'s request to join ${team.name} is cancelled`);
 				return;
 			}
 		}
@@ -834,13 +835,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "approve") {
 				if (info.caller === callerUser.id) {
-					throw new InteractionError(`You cannot approve own rename request`);
+					throw new InteractionError(`You cannot approve your own rename request`);
 				} else if (info.approved.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot approve rename request again`);
+					throw new InteractionError(`You cannot approve this rename request again`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot approve rename request after rejecting`);
+					throw new InteractionError(`You cannot approve this rename request after rejecting it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					throw new InteractionError(`You are not in team`);
+					throw new InteractionError(`You are not in this team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.approved.push(callerUser.id);
@@ -867,18 +868,18 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Approved rename request from ${team.name} to ${info.newTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Approved request to rename team ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "reject") {
 				if (info.caller === callerUser.id) {
-					throw new InteractionError(`You cannot reject own rename request`);
+					throw new InteractionError(`You cannot reject your own rename request`);
 				} else if (info.rejected.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot reject rename request again`);
+					throw new InteractionError(`You cannot reject this rename request again`);
 				} else if (info.approved.includes(callerUser.id)) {
-					throw new InteractionError(`You cannot reject rename request after approving`);
+					throw new InteractionError(`You cannot reject this rename request after approving it`);
 				} else if (!info.waiting.includes(callerUser.id)) {
-					throw new InteractionError(`You are not in team`);
+					throw new InteractionError(`You are not in this team`);
 				}
 				removeFromArray(info.waiting, callerUser.id);
 				info.rejected.push(callerUser.id);
@@ -894,12 +895,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				await transaction.commit();
 				await message.edit(await createTeamRenameRequestOptionsFromInfo(info));
-				await interaction.followUp({ ephemeral, content: `Rejected rename request from ${team.name} to ${info.newTeamName}` });
+				await interaction.followUp({ ephemeral, content: `Rejected request to rename team ${team.name} to ${info.newTeamName}` });
 				return;
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					throw new InteractionError(`You aren't rename requester`);
+					throw new InteractionError(`You can't cancel someone else's request to rename team`);
 				}
 				const teamName = info.newTeamName;
 				const options = await createTeamRenameRequestOptionsFromInfo(info, true);
@@ -921,7 +922,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const joinRandomInfo = await transaction.fetch(`/joinRandom`);
 				// fail if its the same dude lol
 				if (joinRandomInfo.caller === callerUser.id) {
-					throw new InteractionError(`You can't team up with youself`);
+					throw new InteractionError(`You can't team up with yourself`);
 				}
 				// generate a random team name that doesn't exist
 				const teamName = `${Math.floor(Math.random() * 2000)}`
@@ -930,7 +931,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const otherUser = await fetchUser(transaction, joinRandomInfo.caller);
 				// fail if the other dude made a team already
 				if (otherUser.teamId != null) {
-					throw new InteractionError(`Other user now has a team`);
+					throw new InteractionError(`The other user now has a team`);
 				}
 				// make a team with them and have it be open to others
 				const team = await createTeam(interaction.guild, transaction, { id: interaction.id, name: teamName, freeToJoin: true });
@@ -948,7 +949,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (interaction.customId === "cancel") {
 				if (info.caller !== callerUser.id) {
-					throw new InteractionError(`You aren't the original requester`);
+					throw new InteractionError(`You can't cancel someone else's request to team up`);
 				}
 				// remove interaction info and joinRandom info
 				removeFromArray((await transaction.fetch(`/interactions`)).interactionIds, interaction.message.id);
@@ -957,7 +958,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				clearObject(joinRandomInfo);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Cancelled join random request` });
+				await interaction.followUp({ ephemeral, content: `Cancelled request to team up` });
 				await (await interaction.channel.messages.fetch(interaction.message.id)).delete();
 				return;
 			}
@@ -967,22 +968,22 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			const workshop = await transaction.fetch(`/workshop/${info.workshopId}`);
 			if (interaction.customId === "add") {
 				if (caller.roles.cache.has(workshop.discordRoleId)) {
-					throw new InteractionError(`You already have the ${workshop.name} role`);
+					throw new InteractionError(`You already have the ${workshop.name} workshop role`);
 				}
 				await caller.roles.add(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Added ${workshop.name} role to you` });
+				await interaction.followUp({ ephemeral, content: `Added ${workshop.name} workshop role to you` });
 				return;
 			}
 			if (interaction.customId === "remove") {
 				if (!caller.roles.cache.has(workshop.discordRoleId)) {
-					throw new InteractionError(`You already don't have the ${workshop.name} role`);
+					throw new InteractionError(`You already don't have the ${workshop.name} workshop role`);
 				}
 				await caller.roles.remove(workshop.discordRoleId);
 				// complete command
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Removed ${workshop.name} role from you` });
+				await interaction.followUp({ ephemeral, content: `Removed ${workshop.name} workshop role from you` });
 				return;
 			}
 		}
@@ -1450,7 +1451,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: `Just to confirm, are you attempting to destroy ${workshop.name} with code ${workshop.id}`,
+					content: `Just to confirm, are you attempting to destroy workshop ${workshop.name} with code ${workshop.id}`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
@@ -1606,19 +1607,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const transaction = createTransaction(resources);
 				// fail if another team with same name exists
 				if (await findTeam(transaction, { name: teamName }) != null) {
-					throw new InteractionError(`Team called ${teamName} already exists`);
+					throw new InteractionError(`Team ${teamName} already exists`);
 				}
 				// fail if name is longer than 32 characters
 				if (!(teamName.length <= 32)) {
-					throw new InteractionError(`Team name ${teamName} too long`);
+					throw new InteractionError(`The name ${teamName} is too long`);
 				}
 				// fail if caller was specified
 				if (teamMates.some(member => interaction.user.id === member.id)) {
-					throw new InteractionError(`Caller was specified again as a team mate`);
+					throw new InteractionError(`You can't add yourself as a team mate`);
 				}
 				// fail if team mates aren't unique
 				if ((new Set(teamMates.map(member => member.id))).size !== teamMates.length) {
-					throw new InteractionError(`A team mate was repeated in the command`);
+					throw new InteractionError(`A team mate was repeated`);
 				}
 				// create caller and team mates
 				let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
@@ -1672,7 +1673,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if team with name doesnt exists
 				const team = await findTeam(transaction, { name: teamName });
 				if (team == null) {
-					throw new InteractionError(`Team called ${teamName} doesn't exist`);
+					throw new InteractionError(`Team ${teamName} doesn't exist`);
 				}
 				// create caller
 				let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
@@ -1718,14 +1719,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Confirmation timed out`);
 				}
 				if (nextInteraction.customId.endsWith("no")) {
-					throw new InteractionError(`Cancelled join request`);
+					throw new InteractionError(`Cancelled request to join`);
 				}
 				// fail if team is full
 				if (team.memberIds.length >= 4) {
-					throw new InteractionError(`Requested team is full`);
+					throw new InteractionError(`That team is full :(`);
 				}
 				// complete command and commit transaction
-				await interaction.followUp({ ephemeral, content: `Creating join request...` });
+				await interaction.followUp({ ephemeral, content: `Creating request to join...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], [], true));
@@ -1765,11 +1766,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// fail if name is longer than 32 characters
 				if (!(newTeamName.length <= 32)) {
-					throw new InteractionError(`Team name ${newTeamName} too long`);
+					throw new InteractionError(`The name ${newTeamName} is too long`);
 				}
 				// fail if another team with same name exists
 				if (await findTeam(transaction, { name: newTeamName }) != null) {
-					throw new InteractionError(`Team called ${newTeamName} already exists`);
+					throw new InteractionError(`Team ${newTeamName} already exists`);
 				}
 				const team = await fetchTeam(transaction, callerUser.teamId);
 				const teamMateDiscordUserIds = [];
@@ -1777,7 +1778,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					teamMateDiscordUserIds.push((await fetchUser(transaction, memberId)).discordUserId);
 				};
 				// complete command and commit transaction
-				await interaction.reply({ ephemeral, content: `Creating rename request...` });
+				await interaction.reply({ ephemeral, content: `Creating request to rename team...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
 				const reply = await interaction.channel.send(createTeamRenameRequestOptions(team.name, newTeamName, `<@${callerUser.discordUserId}>`, removeFromArray(teamMateDiscordUserIds, callerUser.discordUserId).map(i => `<@${i}>`), [`<@${callerUser.discordUserId}>`], [], true));
@@ -1847,7 +1848,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if ("start" in joinRandomInfo) {
 					// fail if its the same dude lol
 					if (joinRandomInfo.caller === callerUser.id) {
-						throw new InteractionError(`You are already waiting to join a random team`);
+						throw new InteractionError(`You are already waiting to team up`);
 					}
 					// generate a random team name that doesn't exist
 					const teamName = `${Math.floor(Math.random() * 2000)}`
@@ -1873,7 +1874,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// create delayed interaction info
 				const message = await interaction.channel.send({
-					content: `${interaction.user} is looking for a team! DM them if you want to team up or run /team join-random to create one immediately!`,
+					content: `${interaction.user} is looking for a team! Press the button to create a team with them.`,
 					components: [
 						new MessageActionRow().addComponents(
 							new MessageButton()
