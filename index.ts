@@ -2285,7 +2285,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			for (let i = 0; i < leaderboard.topTeamIds.length; i++) {
 				const team = await fetchTeam(resources, leaderboard.topTeamIds[i]);
 				const points = leaderboard.topTeamPoints[i];
-				info[`Team ${team.name}`] = [ `${points} points (id: ${team.id})` ];
+				info[`Team ${team.name}`] = [ `${points} points` ];
 			}
 			const options = createInfoOptions({
 				title: `Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)`,
