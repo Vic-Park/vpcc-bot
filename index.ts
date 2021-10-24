@@ -1,7 +1,7 @@
 // Runs the VPCC-Bot
 
 import _assert from "assert";
-import { CategoryChannel, Client, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, TextChannel, VoiceChannel } from "discord.js";
+import { CategoryChannel, Client, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, Team, TextChannel, User, VoiceChannel } from "discord.js";
 import Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import NodeCache from "node-cache";
@@ -2351,7 +2351,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		let content: string;
 		if (!(e instanceof InteractionError)) {
 			console.error(e);
-			content = `Oops... Internal Error: ${e}`;
+			content = `Oops... Internal Error (bot maintainers are on the way): ${e}`;
+			if (!client.isReady()) {
+				console.log("Couldn't get bot owner because bot ain't ready???");
+			} else if (client.application.owner instanceof User) {
+				client.application.owner.send(`Internal Error by (${interaction.user.tag} - ${interaction.user}): ${e}`);
+			} else if (client.application.owner instanceof Team) {
+				for (const member of client.application.owner.members.values())
+					member.user.send(`Internal Error by (${interaction.user.tag} - ${interaction.user}): ${e}`);
+			} else {
+				console.log("Couldn't get bot owner :/");
+			}
 		} else {
 			content = `Oops... ${e.message}`;
 		}
