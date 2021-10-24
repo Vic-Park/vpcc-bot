@@ -2299,7 +2299,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					info: {
 						"Points": [ `${points}` ],
 						"Challenges": [ `${challenges.length}` ],
-						"Submission": [ `${submissions.length}` ],
+						"Submissions": [ `${submissions.length}` ],
 					},
 				}),
 			});
