@@ -2237,7 +2237,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				`Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)\n`
 				+ teamLines.map(s => `${s}\n`).join("")
 			);
-			if (updated) 
+			if (updated)
 				await interaction.followUp({ ephemeral, content});
 			else
 				await interaction.reply({ ephemeral, content});
