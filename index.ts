@@ -174,7 +174,6 @@ type TeamData = {
 	discordTextChannelId: string,
 	discordVoiceChannelId: string,
 	freeToJoin?: boolean,
-	pointEvents?: Record<string, any>,
 	submissionIds?: string[],
 }
 
