@@ -1911,37 +1911,16 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
 				await transaction.commit();
 			}
-			// get current team / points / medals
 			// get team
-			const teamId = user.teamId;
-			const teamName = teamId && (await fetchTeam(resources, teamId)).name;
-			/*
-			// get points this month
-			const pointsThisMonth = [...user.pointEvents || []].reduce((points, { type, deltaPoints }) => {
-				if (type == "add") {
-					return points + deltaPoints;
-				}
-				if (type == "clear") {
-					return 0;
-				}
-			}, 0);
-			// get number of medals
-			const numMedals = [...user.medalEvents || []].reduce((numMedals, { type }) => {
-				if (type == "add") {
-					return numMedals + 1;
-				}
-			}, 0);
-			*/
-			const pointsThisMonth = 0; const numMedals = 0;
-			// build response
-			const parts = [];
-			parts.push(`Summary for ${metadata.userDisplayName}`);
-			if (teamId)
-				parts.push(`- Team: ${teamName}`);
-			parts.push(`- Points this month: ${pointsThisMonth}`);
-			parts.push(`- Medals: ${numMedals}`);
+			const team = user.teamId ? await fetchTeam(resources, user.teamId) : undefined;
 			// send response
-			await interaction.reply({ content: parts.join("\n"), allowedMentions: { parse: [] }});
+			await interaction.reply({
+				ephemeral,
+				...createInfoOptions({
+					title: `User <@${user.discordUserId}> (id: ${user.id})`,
+					info: { "Team": team && [ team.name ] },
+				}),
+			});
 			return;
 		}
 
