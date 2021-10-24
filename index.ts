@@ -1373,11 +1373,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Created workshop` });
 				await message.edit({
-					content: (
-						`New ${workshopName} workshop by ${interaction.user}! (code: ${workshopCode})\n`
-						+ `Text Channel: <#${workshop.discordTextChannelId}>\n`
-						+ `Voice Channel: <#${workshop.discordVoiceChannelId}>\n`
-						+ `Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`
+					content: createInfoContent(
+						`New ${workshopName} workshop by ${interaction.user}!`,
+						`Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`,
+						{ "Text Channel": [`<#${workshop.discordTextChannelId}>`], "Voice Channel": [`<#${workshop.discordVoiceChannelId}>`] },
 					),
 					components: [
 						new MessageActionRow().addComponents(
@@ -1602,11 +1601,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				Object.assign(challenge, challengeInfo);
 				// commit and complete
 				await transaction.commit();
-				await interaction.channel.send(
-					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})\n`
-					+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
-					+ ` - Points: ${challengeInfo.points}\n`
-				);
+				await interaction.channel.send(createInfoContent(
+					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`, "",
+					{
+						"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
+						"Points": [`${challengeInfo.points}`],
+					},
+				));
 				return;
 			}
 			if (subcommandName === "give-team") {
@@ -1663,12 +1664,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				Object.assign(submission, submissionInfo);
 				// commit and complete
 				await transaction.commit();
-				await interaction.channel.send(
-					`Created submission (id: ${submissionInfo.id})\n`
-					+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
-					+ ` - Team: ${team.name} (id: ${team.id})\n`
-					+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
-				);
+				await interaction.channel.send(createInfoContent(
+					`Created submission (id: ${submissionInfo.id})`, "",
+					{
+						"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+						"Team": [`${team.name} (id: ${team.id})`],
+						"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+					},
+				));
 				return;
 			}
 			if (subcommandName === "give-team-of") {
@@ -1723,12 +1726,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: (
-						`Created submission (id: ${submissionInfo.id})\n`
-						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
-						+ ` - Member: <@${user.discordUserId}> (id: ${user.id})\n`
-						+ ` - Team: ${team.name} (id: ${team.id})\n`
-						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
+					content: createInfoContent(
+						`Created submission (id: ${submissionInfo.id})`, "",
+						{
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Member": [`<@${user.discordUserId}> (id: ${user.id})`],
+							"Team": [`${team.name} (id: ${team.id})`],
+							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+						},
 					),
 				});
 				return;
@@ -1749,13 +1754,15 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// complete
 				await interaction.reply({
 					ephemeral,
-					content: (
-						`Submission (id: ${submission.id}):\n`
-						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
-						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
-						+ ` - Team: ${team.name} (id: ${team.id})\n`
-						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
-						+ (submission.content ? ` - Content: ${submission.content}\n` : "")
+					content: createInfoContent(
+						`Submission (id: ${submission.id})`, "",
+						{
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
+							"Team": [`${team.name} (id: ${team.id})`],
+							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+							"Content": submission.content && [submission.content],
+						},
 					),
 				});
 				return;
@@ -1780,11 +1787,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// complete
 				await interaction.reply({
 					ephemeral,
-					content: (
-						`Challenge ${challenge.name} (id: ${challenge.id})\n`
-						+ (workshop ? `- Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
-						+ `- Points: ${challenge.points}\n`
-						+ `- Submission IDs: ${(challenge.submissionIds ?? []).join(", ")}\n`
+					content: createInfoContent(
+						`Challenge ${challenge.name} (id: ${challenge.id})`, "",
+						{
+							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
+							"Points": [`${challenge.points}`],
+							"Submission IDs": (challenge.submissionIds ?? []),
+						},
 					),
 				});
 				return;
@@ -1807,14 +1816,15 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: (
-						`Just to confirm, are you attempting to`
-						+ ` destroy submission (id: ${submission.id})\n`
-						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
-						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
-						+ ` - Team: ${team.name} (id: ${team.id})\n`
-						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
-						+ (submission.content ? ` - Content: ${submission.content}\n` : "")
+					content: createInfoContent(
+						`Just to confirm, are you attempting to destroy submission (id: ${submission.id})`, "",
+						{
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
+							"Team": [`${team.name} (id: ${team.id})`],
+							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+							"Content": submission.content && [submission.content],
+						},
 					),
 					components: [
 						new MessageActionRow().addComponents(
@@ -1855,12 +1865,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: (
-						`Removed submission (id: ${submissionInfo.id})\n`
-						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
-						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
-						+ ` - Team: ${team.name} (id: ${team.id})\n`
-						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
+					content: createInfoContent(
+						`Removed submission (id: ${submissionInfo.id})`, "",
+						{
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Member": user && [`<@${user.discordUserId}> (id: ${user.id})`],
+							"Team": [`${team.name} (id: ${team.id})`],
+							"Points": [`${challenges.reduce((p, c) => p + c.points, 0)}`],
+						},
 					),
 				});
 				return;
@@ -1890,11 +1902,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
 				await interaction.reply({
 					ephemeral,
-					content: (
-						`Just to confirm, are you attempting to`
-						+ ` destroy challenge ${challenge.name} (id: ${challenge.id})\n`
-						+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
-						+ ` - Points: ${challenge.points}\n`
+					content: createInfoContent(
+						`Just to confirm, are you attempting to destroy challenge ${challenge.name} (id: ${challenge.id})`, "",
+						{
+							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
+							"Points": [`${challenge.points}`],
+						},
 					),
 					components: [
 						new MessageActionRow().addComponents(
@@ -1934,10 +1947,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await transaction.commit();
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
-					content: (
-						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})\n`
-						+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
-						+ ` - Points: ${challengeInfo.points}\n`
+					content: createInfoContent(
+						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`, "",
+						{
+							"Workshop": workshop && [`${workshop.name} (id: ${workshop.id})`],
+							"Points": [`${challengeInfo.points}`],
+						},
 					),
 				});
 				return;
@@ -2422,11 +2437,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			// complete
 			await interaction.reply({
 				ephemeral,
-				content: (
-					`Team ${team.name} (id: ${team.id})\n`
-					+ ` - Points: ${points}\n`
-					+ ` - Challenges: ${challenges.length}\n`
-					+ ` - Submissions: ${submissions.length}\n`
+				content: createInfoContent(
+					`Team ${team.name} (id: ${team.id})`, "",
+					{
+						"Points": [`${points}`],
+						"Challenges": [`${challenges.length}`],
+						"Submission": [`${submissions.length}`],
+					},
 				),
 			});
 			return;
