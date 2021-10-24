@@ -2331,6 +2331,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				team = await fetchTeam(resources, user.teamId);
 			}
 			// get linked stuff
+			const members = [];
+			for (const memberId of team.memberIds)
+				members.push(await fetchUser(resources, memberId));
 			const submissions = [];
 			for (const submissionId of team.submissionIds ??= [])
 				submissions.push(await resources.fetch(`/submissions/${submissionId}`));
@@ -2341,6 +2344,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			const challenges = [];
 			for (const challengeId of _challengeIds)
 				challenges.push(await resources.fetch(`/challenges/${challengeId}`));
+			const _workshopIds = new Set();
+			for (const challenge of challenges)
+				if (challenge.workshopId)
+					_workshopIds.add(challenge.workshopId)
+			const workshops = [];
+			for (const workshopId of _workshopIds)
+				workshops.push(await resources.fetch(`/workshop/${workshopId}`));
 			// calculate stats
 			let points = 0;
 			for (const challenge of challenges)
@@ -2352,8 +2362,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					title: `Team ${team.name} (id: ${team.id})`,
 					info: {
 						"Points": [ `${points}` ],
+						"Members": [ `${members.map(u => `<@${u.discordUserId}>`)}` ],
+						"Workshops": [ `${workshops.length}` ],
 						"Challenges": [ `${challenges.length}` ],
 						"Submissions": [ `${submissions.length}` ],
+						"Last Challenge": challenges.length ? [ `${challenges[challenges.length - 1].name}` ] : undefined,
 					},
 				}),
 			});
