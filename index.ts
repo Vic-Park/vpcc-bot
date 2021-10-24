@@ -945,9 +945,19 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 		let content: string;
 		if (!(e instanceof InteractionError)) {
 			console.error(e);
-			content = `Oops, an internal error occurred: ${e}`;
+			content = `Oops... Internal Error (bot maintainers are on the way): ${e}`;
+			if (!client.isReady()) {
+				console.log("Couldn't get bot owner because bot ain't ready???");
+			} else if (client.application.owner instanceof User) {
+				client.application.owner.send(`Internal Error by (${interaction.user.tag} - ${interaction.user}): ${e}`);
+			} else if (client.application.owner instanceof Team) {
+				for (const member of client.application.owner.members.values())
+					member.user.send(`Internal Error by (${interaction.user.tag} - ${interaction.user}): ${e}`);
+			} else {
+				console.log("Couldn't get bot owner :/");
+			}
 		} else {
-			content = e.message;
+			content = `Oops... ${e.message}`;
 		}
 		try {
 			await interaction.followUp({ ephemeral, content });
