@@ -2295,7 +2295,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			console.log([ "leaderboard", metadata ]);
 			// throttle to 1 update per 5 minutes
 			let leaderboard = await resources.fetch(`/leaderboard`);
+			let updated = false;
 			if (Date.now() >= (leaderboard.lastUpdatedTimestamp ?? 0) + 5 * 60_000) {
+				await interaction.reply({ ephemeral, content: `Updating leaderboard...` });
+				updated = true;
 				const transaction = createTransaction(resources);
 				const leaderboard = await transaction.fetch(`/leaderboard`);
 				leaderboard.lastUpdatedTimestamp = Date.now();
@@ -2342,13 +2345,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const points = leaderboard.topTeamPoints[i];
 				teamLines.push(` - Team ${team.name} (points: ${points}, id: ${team.id})`);
 			}
-			await interaction.reply({
-				ephemeral,
-				content: (
-					`Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)\n`
-					+ teamLines.map(s => `${s}\n`).join("")
-				),
-			});
+			const content = (
+				`Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)\n`
+				+ teamLines.map(s => `${s}\n`).join("")
+			);
+			if (updated) 
+				await interaction.followUp({ ephemeral, content});
+			else
+				await interaction.reply({ ephemeral, content});
 			return;
 		}
 
