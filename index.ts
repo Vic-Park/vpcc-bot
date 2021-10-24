@@ -1735,7 +1735,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
 						+ ` - Team: ${team.name} (id: ${team.id})\n`
 						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
-						+ (submission.content ? ` - Content: ${submission.content}):\n` : "")
+						+ (submission.content ? ` - Content: ${submission.content}\n` : "")
 					),
 				});
 				return;
