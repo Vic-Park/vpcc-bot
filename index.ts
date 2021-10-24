@@ -1587,9 +1587,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// commit and complete
 				await transaction.commit();
 				await interaction.channel.send(
-					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`
-					+ (workshop ? ` for workshop ${workshop.name} (id: ${workshop.id})` : "")
-					+ ` worth ${challengeInfo.points} points`
+					`Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})\n`
+					+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
+					+ ` - Points: ${challengeInfo.points}\n`
 				);
 				return;
 			}
@@ -1644,10 +1644,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// commit and complete
 				await transaction.commit();
 				await interaction.channel.send(
-					`Created submission (id: ${submissionInfo.id})`
-					+ ` to challenge ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
-					+ ` for team ${team.name} (id: ${team.id})`
-					+ ` worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+					`Created submission (id: ${submissionInfo.id})\n`
+					+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
+					+ ` - Team: ${team.name} (id: ${team.id})\n`
+					+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
 				);
 				return;
 			}
@@ -1704,11 +1704,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
 					content: (
-						`Created submission (id: ${submissionInfo.id})`
-						+ ` to challenges ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
-						+ ` for team of <@${user.discordUserId}> (id: ${user.id})`
-						+ ` - team ${team.name} (id: ${team.id})`
-						+ ` - worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+						`Created submission (id: ${submissionInfo.id})\n`
+						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
+						+ ` - Member: <@${user.discordUserId}> (id: ${user.id})\n`
+						+ ` - Team: ${team.name} (id: ${team.id})\n`
+						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
 					),
 				});
 				return;
@@ -1831,11 +1831,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
 					content: (
-						`Removed submission (id: ${submissionInfo.id})`
-						+ ` to challenges ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}`
-						+ ` from team ${team.name} (id: ${team.id})`
-						+ (user ? ` of <@${user.discordUserId}> (id: ${user.id})` : "")
-						+ ` worth ${challenges.reduce((p, c) => p + c.points, 0)} points`
+						`Removed submission (id: ${submissionInfo.id})\n`
+						+ ` - Challenges: ${challenges.map(c => `${c.name} (id: ${c.id})`).join(", ")}\n`
+						+ (user ? ` - Member: <@${user.discordUserId}> (id: ${user.id})\n` : "")
+						+ ` - Team: ${team.name} (id: ${team.id})\n`
+						+ ` - Points: ${challenges.reduce((p, c) => p + c.points, 0)}\n`
 					),
 				});
 				return;
@@ -1908,9 +1908,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send({
 					allowedMentions: { parse: [] },
 					content: (
-						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`
-						+ (workshop ? ` from workshop ${workshop.name} (id: ${workshop.id})` : "")
-						+ ` worth ${challengeInfo.points} points`
+						`Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})\n`
+						+ (workshop ? ` - Workshop: ${workshop.name} (id: ${workshop.id})\n` : "")
+						+ ` - Points: ${challengeInfo.points}\n`
 					),
 				});
 				return;
