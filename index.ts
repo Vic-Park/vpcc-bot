@@ -1455,21 +1455,21 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// destroy workshop role
 				if (workshop.discordRoleId) {
 					const role = await interaction.guild.roles.fetch(workshop.discordRoleId);
-					assert(role);
-					await role.delete();
+					if (role)
+						await role.delete();
 					delete workshop.discordRoleId;
 				}
 				// destroy workshop channels
 				if (workshop.discordTextChannelId) {
 					const textChannel = await interaction.guild.channels.fetch(workshop.discordTextChannelId);
-					assert(textChannel);
-					await textChannel.delete();
+					if (textChannel)
+						await textChannel.delete();
 					delete workshop.discordTextChannelId;
 				}
 				if (workshop.discordVoiceChannelId) {
 					const voiceChannel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
-					assert(voiceChannel);
-					await voiceChannel.delete();
+					if (voiceChannel)
+						await voiceChannel.delete();
 					delete workshop.discordVoiceChannelId;
 				}
 				// destroy team if required
