@@ -428,6 +428,60 @@ client.once("ready", async () => {
 	}
 });
 
+// - Resolution functions
+
+async function resolveUser(resources: Fetchable, userResolvable: string): Promise<UserData | undefined> {
+	const userById = await resources.fetch(`/user/${userResolvable}`);
+	if (userById.id)
+		return userById as UserData;
+	for (const userId of (await resources.fetch(`/users`)).userIds ?? []) {
+		const user = await resources.fetch(`/user/${userId}`);
+		if (user.discordUserId === userResolvable)
+			return user as UserData;
+	}
+}
+
+async function resolveTeam(resources: Fetchable, teamResolvable: string): Promise<TeamData | undefined> {
+	const teamById = await resources.fetch(`/team/${teamResolvable}`);
+	if (teamById.id)
+		return teamById as TeamData;
+	for (const teamId of (await resources.fetch(`/teams`)).teamIds ?? []) {
+		const team = await resources.fetch(`/team/${teamId}`);
+		if (team.name.toLowerCase() === teamResolvable.toLowerCase())
+			return team as TeamData;
+	}
+}
+
+async function resolveWorkshop(resources: Fetchable, workshopResolvable: string): Promise<Record<string, any> | undefined> {
+	const workshopById = await resources.fetch(`/workshop/${workshopResolvable}`);
+	if (workshopById.id)
+		return workshopById;
+	for (const workshopId of (await resources.fetch(`/workshops`)).ids ?? []) {
+		const workshop = await resources.fetch(`/workshop/${workshopId}`);
+		if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
+			return workshop;
+	}
+}
+
+async function resolveChallenge(resources: Fetchable, challengeResolvable: string): Promise<Record<string, any> | undefined> {
+	const challengeById = await resources.fetch(`/challenges/${challengeResolvable}`);
+	if (challengeById.id)
+		return challengeById;
+	for (const challengeId of (await resources.fetch(`/challenges`)).ids ?? []) {
+		const challenge = await resources.fetch(`/challenges/${challengeId}`);
+		if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
+			return challenge;
+	}
+}
+
+async function resolveSubmission(resources: Fetchable, submissionResolvable: string): Promise<Record<string, any> | undefined> {
+	const submissionById = await resources.fetch(`/submissions/${submissionResolvable}`);
+	if (submissionById.id)
+		return submissionById;
+}
+
+// - Prompt creation helpers
+
 function createInfoOptions({ title, description = undefined, info }: {
 	title: string,
 	description?: string,
@@ -1294,17 +1348,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "announce-workshop", workshopResolvable, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if workshop couldn't be resolved
-				let workshop = await transaction.fetch(`/workshop/${workshopResolvable}`);
-				if (workshop.id == null) {
-					workshops: {
-						for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
-							workshop = await transaction.fetch(`/workshop/${workshopId}`);
-							if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
-								break workshops;
-						}
-						throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
-					}
-				}
+				const workshop = await resolveWorkshop(transaction, workshopResolvable);
+				if (!workshop)
+					throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
 				// fail if workshop already has been announced
 				if (workshop.interactionId)
 					throw new InteractionError(`Workshop ${workshop.name} has already been announced`);
@@ -1516,17 +1562,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if workshop couldn't be resolved
 				let workshop = undefined;
 				if (workshopResolvable) {
-					workshop = await transaction.fetch(`/workshop/${workshopResolvable}`);
-					if (workshop.id == null) {
-						workshops: {
-							for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
-								workshop = await transaction.fetch(`/workshop/${workshopId}`);
-								if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
-									break workshops;
-							}
-							throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
-						}
-					}
+					workshop = await resolveWorkshop(transaction, workshopResolvable);
+					if (!workshop)
+						throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
 				}
 				// reply to interaction
 				await interaction.reply({ ephemeral, content: `Creating challenge...` });
@@ -1563,31 +1601,15 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "give-team", teamResolvable, challengeResolvables, content, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team couldn't be resolved
-				let team = await transaction.fetch(`/team/${teamResolvable}`);
-				if (team.id == null) {
-					teams: {
-						for (const teamId of (await transaction.fetch(`/teams`)).teamIds ??= []) {
-							team = await transaction.fetch(`/team/${teamId}`);
-							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
-								break teams;
-						}
-						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
-					}
-				}
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Could not resolve team ${teamResolvable}`);
 				// fail if any challenge couldn't be resolved
 				const challenges = [];
 				for (const challengeResolvable of challengeResolvables) {
-					let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
-					if (challenge.id == null) {
-						challenges: {
-							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
-								challenge = await transaction.fetch(`/challenges/${challengeId}`);
-								if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
-									break challenges;
-							}
-							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
-						}
-					}
+					const challenge = await resolveChallenge(transaction, challengeResolvable);
+					if (!challenge)
+						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
 					challenges.push(challenge);
 				}
 				// reply to interaction
@@ -1633,17 +1655,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// fail if any challenge couldn't be resolved
 				const challenges = [];
 				for (const challengeResolvable of challengeResolvables) {
-					let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
-					if (challenge.id == null) {
-						challenges: {
-							for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
-								challenge = await transaction.fetch(`/challenges/${challengeId}`);
-								if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
-									break challenges;
-							}
-							throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
-						}
-					}
+					const challenge = await resolveChallenge(transaction, challengeResolvable);
+					if (!challenge)
+						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
 					challenges.push(challenge);
 				}
 				// reply to interaction
@@ -1716,17 +1730,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const challengeResolvable = interaction.options.getString("challenge", true);
 				console.log([ "admin", "get-challenge", challengeResolvable, metadata ]);
 				// fail if challenge couldn't be resolved
-				let challenge = await resources.fetch(`/challenges/${challengeResolvable}`);
-				if (challenge.id == null) {
-					challenges: {
-						for (const challengeId of (await resources.fetch(`/challenges`)).ids ??= []) {
-							challenge = await resources.fetch(`/challenges/${challengeId}`);
-							if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
-								break challenges;
-						}
-						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
-					}
-				}
+				const challenge = await resolveChallenge(resources, challengeResolvable);
+				if (!challenge)
+					throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
 				// get linked stuff
 				const workshop = challenge.workshopId ? await resources.fetch(`/workshop/${challenge.workshopId}`) : undefined;
 				// complete
@@ -1747,17 +1753,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const workshopResolvable = interaction.options.getString("workshop", true);
 				console.log([ "admin", "get-workshop", workshopResolvable, metadata ]);
 				// fail if workshop couldn't be resolved
-				let workshop = await resources.fetch(`/workshop/${workshopResolvable}`);
-				if (workshop.id == null) {
-					workshops: {
-						for (const workshopId of (await resources.fetch(`/workshops`)).ids ??= []) {
-							workshop = await resources.fetch(`/workshop/${workshopId}`);
-							if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
-								break workshops;
-						}
-						throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
-					}
-				}
+				const workshop = await resolveWorkshop(resources, workshopResolvable);
+				if (!workshop)
+					throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
 				// get linked stuff
 				const challenges = [];
 				for (const challengeId of workshop.challengeIds ?? [])
@@ -1804,17 +1802,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const teamResolvable = interaction.options.getString("team", true);
 				console.log([ "admin", "get-team", teamResolvable, metadata ]);
 				// fail if team couldn't be resolved
-				let team = await resources.fetch(`/team/${teamResolvable}`);
-				if (team.id == null) {
-					teams: {
-						for (const teamId of (await resources.fetch(`/teams`)).teamIds ??= []) {
-							team = await resources.fetch(`/team/${teamId}`);
-							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
-								break teams;
-						}
-						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
-					}
-				}
+				const team = await resolveTeam(resources, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Could not resolve team ${teamResolvable}`);
 				// get linked stuff
 				const members = [];
 				for (const memberId of team.memberIds)
@@ -1863,9 +1853,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "delete-submission", submissionId, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if submission doesn't exist
-				let submission = await transaction.fetch(`/submissions/${submissionId}`);
-				if (submission.id == null)
-					throw new InteractionError(`Could not find submission with id: ${submissionId}`);
+				const submission = await resolveSubmission(transaction, submissionId);
+				if (!submission)
+					throw new InteractionError(`Could not resolve submission ${submissionId}`);
 				// get team / challenge
 				const team = await fetchTeam(transaction, submission.teamId);
 				const user = submission.memberId ? await fetchUser(transaction, submission.memberId) : undefined;
@@ -1936,17 +1926,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "delete-challenge", challengeResolvable, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if challenge couldn't be resolved
-				let challenge = await transaction.fetch(`/challenges/${challengeResolvable}`);
-				if (challenge.id == null) {
-					challenges: {
-						for (const challengeId of (await transaction.fetch(`/challenges`)).ids ??= []) {
-							challenge = await transaction.fetch(`/challenges/${challengeId}`);
-							if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
-								break challenges;
-						}
-						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
-					}
-				}
+				const challenge = await resolveChallenge(transaction, challengeResolvable);
+				if (!challenge)
+					throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
 				// prevent deletion of challenges with submissions
 				if ((challenge.submissionIds ?? []).length > 0)
 					throw new InteractionError(`Challenge ${challenge.name} (id: ${challenge.id}) has ${challenge.submissionIds.length} submissions :/`);
@@ -2389,17 +2371,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			let team = undefined;
 			if (teamResolvable) {
 				// fail if team couldn't be resolved
-				team = await resources.fetch(`/team/${teamResolvable}`);
-				if (team.id == null) {
-					teams: {
-						for (const teamId of (await resources.fetch(`/teams`)).teamIds ??= []) {
-							team = await resources.fetch(`/team/${teamId}`);
-							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
-								break teams;
-						}
-						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
-					}
-				}
+				team = await resolveTeam(resources, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Could not resolve team ${teamResolvable}`);
 				// fail if team isn't on leaderboard and isn't the user's team
 				const leaderboard = await resources.fetch(`/leaderboard`);
 				if (!(leaderboard.topTeamIds ?? []).includes(team.id)) {
