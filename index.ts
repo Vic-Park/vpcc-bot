@@ -1775,6 +1775,89 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				return;
 			}
+			if (subcommandName === "get-user") {
+				const discordMember = await interaction.guild.members.fetch(interaction.options.getUser("user", true));
+				console.log([ "admin", "get-user", discordMember.user.tag, metadata ]);
+				// create user if doesn't exist
+				let user = await findUser(resources, { discordUserId: discordMember.id });
+				if (!user) {
+					const transaction = createTransaction(resources);
+					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
+					await transaction.commit();
+				}
+				// get linked stuff
+				const team = user.teamId ? await fetchTeam(resources, user.teamId) : undefined;
+				// complete
+				await interaction.reply({
+					ephemeral,
+					...createInfoOptions({
+						title: `User (id: ${user.id})`,
+						info: {
+							"Discord User": [ `<@${user.discordUserId}>` ],
+							"Team": team && [ `${team.name} (id: ${team.id})` ],
+						},
+					}),
+				});
+				return;
+			}
+			if (subcommandName === "get-team") {
+				const teamResolvable = interaction.options.getString("team", true);
+				console.log([ "admin", "get-team", teamResolvable, metadata ]);
+				// fail if team couldn't be resolved
+				let team = await resources.fetch(`/team/${teamResolvable}`);
+				if (team.id == null) {
+					teams: {
+						for (const teamId of (await resources.fetch(`/teams`)).teamIds ??= []) {
+							team = await resources.fetch(`/team/${teamId}`);
+							if (team.name.toLowerCase() === teamResolvable.toLowerCase())
+								break teams;
+						}
+						throw new InteractionError(`Could not resolve team ${teamResolvable}`);
+					}
+				}
+				// get linked stuff
+				const members = [];
+				for (const memberId of team.memberIds)
+					members.push(await fetchUser(resources, memberId));
+				const submissions = [];
+				for (const submissionId of team.submissionIds ??= [])
+					submissions.push(await resources.fetch(`/submissions/${submissionId}`));
+				const _challengeIds = new Set();
+				for (const submission of submissions)
+					for (const challengeId of submission.challengeIds)
+						_challengeIds.add(challengeId)
+				const challenges = [];
+				for (const challengeId of _challengeIds)
+					challenges.push(await resources.fetch(`/challenges/${challengeId}`));
+				const _workshopIds = new Set();
+				for (const challenge of challenges)
+					if (challenge.workshopId)
+						_workshopIds.add(challenge.workshopId)
+				const workshops = [];
+				for (const workshopId of _workshopIds)
+					workshops.push(await resources.fetch(`/workshop/${workshopId}`));
+				// calculate stats
+				let points = 0;
+				for (const challenge of challenges)
+					points += challenge.points;
+				// complete
+				await interaction.reply({
+					ephemeral,
+					...createInfoOptions({
+						title: `Team ${team.name} (id: ${team.id})`,
+						info: {
+							"Points": [ `${points}` ],
+							"Members": [ `${members.map(u => `<@${u.discordUserId}>`)}` ],
+							"Free To Join": [ team.freeToJoin ? "Yes" : "No" ],
+							"Workshops": [ `${workshops.length}` ],
+							"Challenges": [ `${challenges.length}` ],
+							"Submissions": [ `${submissions.length}` ],
+							"Last Challenge": challenges.length ? [ `${challenges[challenges.length - 1].name}` ] : undefined,
+						},
+					}),
+				});
+				return;
+			}
 			if (subcommandName === "delete-submission") {
 				const submissionId = interaction.options.getString("submission-id", true);
 				console.log([ "admin", "delete-submission", submissionId, metadata ]);

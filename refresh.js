@@ -211,6 +211,20 @@ const commands = [
 				.setDescription("Workshop name or code")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
+			.setName("get-user")
+			.setDescription("Gets information on a user")
+			.addUserOption(option => option
+				.setName("user")
+				.setDescription("User")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("get-team")
+			.setDescription("Gets information on a team")
+			.addStringOption(option => option
+				.setName("team")
+				.setDescription("Team name or ID")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
 			.setName("delete-submission")
 			.setDescription("Deletes a submission")
 			.addStringOption(option => option
