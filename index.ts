@@ -2305,7 +2305,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			let leaderboard = await resources.fetch(`/leaderboard`);
 			let updated = false;
 			if (Date.now() >= (leaderboard.lastUpdatedTimestamp ?? 0) + 5 * 60_000) {
-				await interaction.reply({ ephemeral, content: `Updating leaderboard...` });
+				await interaction.reply({ ephemeral, content: `Checking leaderboard...` });
 				updated = true;
 				const transaction = createTransaction(resources);
 				const leaderboard = await transaction.fetch(`/leaderboard`);
@@ -2354,7 +2354,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				info[`Team ${team.name}`] = [ `${points} points` ];
 			}
 			const options = createInfoOptions({
-				title: `Leaderboard (last updated: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)`,
+				title: `Leaderboard (last checked: <t:${Math.floor(leaderboard.lastUpdatedTimestamp / 1000)}:R>)`,
 				info,
 			});
 			if (updated)
