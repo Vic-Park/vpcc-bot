@@ -38,8 +38,8 @@ const commands = [
 			.setName("add-to-team")
 			.setDescription("Adds a user to a team")
 			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of team")
+				.setName("team")
+				.setDescription("Team name or ID")
 				.setRequired(true))
 			.addUserOption(option => option
 				.setName("member")
@@ -49,8 +49,8 @@ const commands = [
 			.setName("remove-from-team")
 			.setDescription("Removes a user from a team")
 			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of team")
+				.setName("team")
+				.setDescription("Team name or ID")
 				.setRequired(true))
 			.addUserOption(option => option
 				.setName("member")
@@ -79,15 +79,15 @@ const commands = [
 			.setName("delete-team")
 			.setDescription("Deletes a team")
 			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of team")
+				.setName("team")
+				.setDescription("Team name or ID")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
 			.setName("rename-team")
 			.setDescription("Renames a team")
 			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of team")
+				.setName("team")
+				.setDescription("Team name or ID")
 				.setRequired(true))
 			.addStringOption(option => option
 				.setName("new-team-name")
@@ -97,8 +97,8 @@ const commands = [
 			.setName("move-to-breakout-rooms")
 			.setDescription("Moves everyone into their team voice channel")
 			.addStringOption(option => option
-				.setName("workshop-code")
-				.setDescription("Workshop code")
+				.setName("workshop")
+				.setDescription("Workshop name or code")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
 			.setName("register-workshop")
@@ -128,8 +128,8 @@ const commands = [
 			.setName("delete-workshop")
 			.setDescription("Deletes a workshop")
 			.addStringOption(option => option
-				.setName("workshop-code")
-				.setDescription("Workshop code")
+				.setName("workshop")
+				.setDescription("Workshop name or code")
 				.setRequired(true))
 			.addBooleanOption(option => option
 				.setName("remove-from-datastore")
@@ -179,7 +179,7 @@ const commands = [
 			.setDescription("Creates a submission and associates challenges")
 			.addUserOption(option => option
 				.setName("member")
-				.setDescription("Team member name or ID")
+				.setDescription("Team member")
 				.setRequired(true))
 			.addStringOption(option => option
 				.setName("challenges")
@@ -200,7 +200,7 @@ const commands = [
 			.setName("get-submission")
 			.setDescription("Gets information on a submission")
 			.addStringOption(option => option
-				.setName("submission-id")
+				.setName("submission")
 				.setDescription("Submission ID")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
@@ -228,7 +228,7 @@ const commands = [
 			.setName("delete-submission")
 			.setDescription("Deletes a submission")
 			.addStringOption(option => option
-				.setName("submission-id")
+				.setName("submission")
 				.setDescription("Submission ID")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
@@ -267,8 +267,8 @@ const commands = [
 			.setName("join")
 			.setDescription("Joins a team")
 			.addStringOption(option => option
-				.setName("team-name")
-				.setDescription("Name of team to join")
+				.setName("team")
+				.setDescription("Team name or ID to join")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
 			.setName("rename")

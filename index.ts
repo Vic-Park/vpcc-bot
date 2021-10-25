@@ -1116,9 +1116,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "remove-from-team") {
-				const teamName = interaction.options.getString("team-name", true);
+				const teamResolvable = interaction.options.getString("team", true);
 				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
-				console.log([ "admin", "remove-from-team", teamName, member, metadata ]);
+				console.log([ "admin", "remove-from-team", teamResolvable, member, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if user doesnt exist
 				const user = await findUser(transaction, { discordUserId: member.id });
@@ -1128,9 +1128,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (user.teamId == null)
 					throw new InteractionError(`User is not in a team`);
 				// fail if team name isn't easy
-				const team = await fetchTeam(transaction, user.teamId);
-				if (team.name !== teamName)
-					throw new InteractionError(`User is in team called ${team.name}, not ${teamName}`);
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Couldn't resolve team ${teamResolvable}`);
+				const teamOfUser = await fetchTeam(transaction, user.teamId);
+				if (team.id !== teamOfUser.id)
+					throw new InteractionError(`User is in team called ${teamOfUser.name}, not ${team.name}`);
 				await interaction.reply({ ephemeral, content: "Removing from team..." });
 				// leave previous team
 				await leaveTeam(interaction.guild, transaction, user);
@@ -1140,13 +1143,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// }
 				// reply to interaction
 				await transaction.commit();
-				await interaction.channel.send(`Removed ${member} from team ${teamName}`);
+				await interaction.channel.send(`Removed ${member} from team ${team.name}`);
 				return;
 			}
 			if (subcommandName === "add-to-team") {
-				const teamName = interaction.options.getString("team-name", true);
+				const teamResolvable = interaction.options.getString("team", true);
 				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
-				console.log([ "admin", "remove-from-team", teamName, member, metadata ]);
+				console.log([ "admin", "remove-from-team", teamResolvable, member, metadata ]);
 				const transaction = createTransaction(resources);
 				// create user if nonexistent
 				let user = await findUser(transaction, { discordUserId: member.id });
@@ -1156,15 +1159,15 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (user.teamId != null)
 					throw new InteractionError(`User is in a team`);
 				// fail if team name doesnt exist
-				const team = await findTeam(transaction, { name: teamName });
-				if (team == null)
-					throw new InteractionError(`Team called ${teamName} doesn't exist`);
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Couldn't resolve team ${teamResolvable}`);
 				await interaction.reply({ ephemeral, content: "Adding to team..." });
 				// leave previous team
 				await joinTeam(interaction.guild, transaction, team, user);
 				// reply to interaction
 				await transaction.commit();
-				await interaction.channel.send(`Added <@${member.id}> to team ${teamName}`);
+				await interaction.channel.send(`Added <@${member.id}> to team ${team.name}`);
 				return;
 			}
 			if (subcommandName === "create-team") {
@@ -1212,13 +1215,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "delete-team") {
-				const teamName = interaction.options.getString("team-name", true);
-				console.log([ "admin", "delete-team", teamName, metadata ]);
+				const teamResolvable = interaction.options.getString("team", true);
+				console.log([ "admin", "delete-team", teamResolvable, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team doesnt exist
-				const team = await findTeam(transaction, { name: teamName });
-				if (team == null)
-					throw new InteractionError(`Team does not exist`);
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Couldn't resolve team ${teamResolvable}`);
 				const teamMates = [];
 				for (const memberId of team.memberIds)
 					teamMates.push(await fetchUser(transaction, memberId));
@@ -1253,6 +1256,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					throw new InteractionError(`Cancelled team destruction`);
 				await interaction.followUp({ ephemeral, content: `Destroying team...` });
 				// destroy team
+				const teamName = team.name;
 				for (const teamMate of teamMates)
 					await leaveTeam(interaction.guild, transaction, teamMate);
 				await destroyTeam(interaction.guild, transaction, team);
@@ -1262,16 +1266,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "rename-team") {
-				const teamName = interaction.options.getString("team-name", true);
+				const teamResolvable = interaction.options.getString("team", true);
 				const newTeamName = interaction.options.getString("new-team-name", true);
-				console.log([ "admin", "rename-team", teamName, newTeamName, metadata ]);
+				console.log([ "admin", "rename-team", teamResolvable, newTeamName, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team doesnt exist
-				const team = await findTeam(transaction, { name: teamName });
-				if (team == null)
-					throw new InteractionError(`Team does not exist`);
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Couldn't resolve team ${teamResolvable}`);
 				await interaction.reply({ ephemeral, content: `Renaming team...` });
 				// rename team
+				const teamName = team.name;
 				await renameTeam(interaction.guild, transaction, team, newTeamName);
 				// reply to interaction
 				await transaction.commit();
@@ -1448,14 +1453,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "delete-workshop") {
-				const workshopCode = interaction.options.getString("workshop-code", true);
+				const workshopResolvable = interaction.options.getString("workshop", true);
 				const removeFromDatastore = interaction.options.getBoolean("remove-from-datastore", false) ?? false;
-				console.log([ "admin", "delete-workshop", workshopCode, metadata ]);
+				console.log([ "admin", "delete-workshop", workshopResolvable, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if workshop doesnt exist
-				const workshop = await transaction.fetch(`/workshop/${workshopCode}`);
-				if (workshop.id == null)
-					throw new InteractionError(`Workshop does not exist`);
+				const workshop = await resolveWorkshop(transaction, workshopResolvable);
+				if (!workshop)
+					throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
 				// prevent deletion of workshops with challenges
 				if ((workshop.challengeIds ?? []).length > 0)
 					throw new InteractionError(`Workshop ${workshop.name} (code: ${workshop.id}) has ${workshop.challengeIds.length} challenges :/`);
@@ -1520,16 +1525,17 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// destroy team if required
 				if (removeFromDatastore) {
+					const workshopName = workshop.name;
 					removeFromArray((await transaction.fetch(`/workshops`)).ids ??= [], workshop.id);
 					clearObject(workshop);
 					// reply to interaction
 					await transaction.commit();
-					await interaction.channel.send(`Destroyed workshop ${workshopCode} and removed it from the datastore`);
+					await interaction.channel.send(`Destroyed workshop ${workshopName} and removed it from the datastore`);
 					return;
 				}
 				// reply to interaction
 				await transaction.commit();
-				await interaction.channel.send(`Destroyed workshop ${workshopCode}`);
+				await interaction.channel.send(`Destroyed workshop ${workshop.name}`);
 				return;
 			}
 			if (subcommandName === "create-support") {
@@ -1698,7 +1704,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "get-submission") {
-				const submissionId = interaction.options.getString("submission-id", true);
+				const submissionId = interaction.options.getString("submission", true);
 				console.log([ "admin", "get-submission", submissionId, metadata ]);
 				// fail if submission doesn't exist
 				let submission = await resources.fetch(`/submissions/${submissionId}`);
@@ -1849,7 +1855,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "delete-submission") {
-				const submissionId = interaction.options.getString("submission-id", true);
+				const submissionId = interaction.options.getString("submission", true);
 				console.log([ "admin", "delete-submission", submissionId, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if submission doesn't exist
@@ -2080,14 +2086,14 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "join") {
-				const teamName = interaction.options.getString("team-name", true);
+				const teamResolvable = interaction.options.getString("team", true);
 				// log command and setup transaction
-				console.log([ "team", "join", teamName, metadata ]);
+				console.log([ "team", "join", teamResolvable, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if team with name doesnt exists
-				const team = await findTeam(transaction, { name: teamName });
-				if (team == null)
-					throw new InteractionError(`Team ${teamName} doesn't exist`);
+				const team = await resolveTeam(transaction, teamResolvable);
+				if (!team)
+					throw new InteractionError(`Couldn't resolve team ${teamResolvable}`);
 				// create caller
 				let callerUser = await findUser(transaction, { discordUserId: interaction.user.id });
 				if (!callerUser)
@@ -2134,7 +2140,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.followUp({ ephemeral, content: `Creating request to join...` });
 				await transaction.commit();
 				// create message that has buttons for confirming stuff
-				const reply = await interaction.channel.send(createTeamJoinRequestOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], [], true));
+				const reply = await interaction.channel.send(createTeamJoinRequestOptions(team.name, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], [], true));
 				// create delayed interaction info
 				const transaction2 = createTransaction(resources);
 				((await transaction2.fetch(`/interactions`)).interactionIds ??= []).push(reply.id);
@@ -2150,7 +2156,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction2.commit();
 				// enable the buttons
-				await reply.edit(createTeamJoinRequestOptions(teamName, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], []));
+				await reply.edit(createTeamJoinRequestOptions(team.name, `<@${callerUser.discordUserId}>`, teamMateDiscordIds.map(i => `<@${i}>`), [], []));
 				return;
 			}
 			if (subcommandName === "rename") {
