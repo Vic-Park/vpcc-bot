@@ -1269,29 +1269,12 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				)) as CategoryChannel | undefined;
 				if (workshopsCategory == null)
 					throw new InteractionError(`No "workshops" category exists`);
-				// fail if no workshops channel exists
-				const workshopsChannel = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
-					channel instanceof TextChannel
-					&& channel.name.toLowerCase() === "workshops"
-				)) as TextChannel | undefined;
-				if (workshopsChannel == null)
-					throw new InteractionError(`No "workshops" channel exists`);
 				await interaction.reply({ ephemeral, content: `Creating workshop...` });
 				// create workshop
 				((await transaction.fetch(`/workshops`)).ids ??= []).push(workshopCode);
 				workshop.id = workshopCode;
 				workshop.name = workshopName;
 				workshop.hostDiscordUserId = interaction.user.id;
-				// create delayed interaction info
-				const message = await workshopsChannel.send("...");
-				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
-				const info = await transaction.fetch(`/interaction/${message.id}`);
-				Object.assign(info, {
-					id: message.id,
-					type: "workshopRole",
-					workshopId: workshop.id,
-				});
-				workshop.interactionId = message.id;
 				// create workshop role
 				const role = await interaction.guild.roles.create({ name: `${workshopName}` });
 				workshop.discordRoleId = role.id;
@@ -1304,16 +1287,56 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// reply to interaction
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Created workshop` });
+				return;
+			}
+			if (subcommandName === "announce-workshop") {
+				const workshopResolvable = interaction.options.getString("workshop", true);
+				console.log([ "admin", "announce-workshop", workshopResolvable, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if workshop couldn't be resolved
+				let workshop = await transaction.fetch(`/workshop/${workshopResolvable}`);
+				if (workshop.id == null) {
+					workshops: {
+						for (const workshopId of (await transaction.fetch(`/workshops`)).ids ??= []) {
+							workshop = await transaction.fetch(`/workshop/${workshopId}`);
+							if (workshop.name.toLowerCase() === workshopResolvable.toLowerCase())
+								break workshops;
+						}
+						throw new InteractionError(`Could not resolve workshop ${workshopResolvable}`);
+					}
+				}
+				// fail if workshop already has been announced
+				if (workshop.interactionId)
+					throw new InteractionError(`Workshop ${workshop.name} has already been announced`);
+				// fail if no workshops channel exists
+				const workshopsChannel = (await interaction.guild.channels.fetch()).find((channel: { name: string; }) => (
+					channel instanceof TextChannel
+					&& channel.name.toLowerCase() === "workshops"
+				)) as TextChannel | undefined;
+				if (workshopsChannel == null)
+					throw new InteractionError(`No "workshops" channel exists`);
+				// create delayed interaction info
+				const message = await workshopsChannel.send("...");
+				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
+				const info = await transaction.fetch(`/interaction/${message.id}`);
+				Object.assign(info, {
+					id: message.id,
+					type: "workshopRole",
+					workshopId: workshop.id,
+				});
+				workshop.interactionId = message.id;
+				// commit and complete
+				await transaction.commit();
 				await message.edit({
 					...createInfoOptions({
-						title: `New ${workshopName} workshop by ${interaction.user}!`,
+						title: `New ${workshop.name} workshop by <@${workshop.hostDiscordUserId}>!`,
 						description: `Press the button to get the workshop role (The host will ping this role for workshop specific announcements)`,
 						info: { "Text Channel": [ `<#${workshop.discordTextChannelId}>` ], "Voice Channel": [ `<#${workshop.discordVoiceChannelId}>` ] },
 					}),
 					components: [
 						new MessageActionRow({ components: [
-							new MessageButton({ customId: "add", label: `Get the ${workshopName} role`, style: "SUCCESS" }),
-							new MessageButton({ customId: "remove", label: `Leave the ${workshopName} role`, style: "DANGER" }),
+							new MessageButton({ customId: "add", label: `Get the ${workshop.name} role`, style: "SUCCESS" }),
+							new MessageButton({ customId: "remove", label: `Leave the ${workshop.name} role`, style: "DANGER" }),
 						] }),
 					]
 				});
