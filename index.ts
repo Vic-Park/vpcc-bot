@@ -534,7 +534,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 	}
 	console.log({
 		timestamp: Date.now(),
-		userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
+		userDisplayName: interaction.user.tag,
 		userId: interaction.user.id,
 		messageId: interaction.message.id,
 		customId: interaction.customId,
@@ -977,7 +977,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
 		const metadata = {
 			timestamp: Date.now(),
-			userDisplayName: `${interaction.user.username}#${interaction.user.discriminator}`,
+			userDisplayName: interaction.user.tag,
 			userId: interaction.user.id,
 		};
 		assert(interaction.guild);
@@ -1624,7 +1624,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				const member = await interaction.guild.members.fetch(interaction.options.getUser("member", true).id);
 				const challengeResolvables = interaction.options.getString("challenges", true).split(",").map(s => s.trim());
 				const content = interaction.options.getString("content") || undefined;
-				console.log([ "admin", "give-team-of", `${member.user.username}#${member.user.discriminator}`, challengeResolvables, content, metadata ]);
+				console.log([ "admin", "give-team-of", member.user.tag, challengeResolvables, content, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if user doesnt exist or doesnt have a previous team
 				const user = await findUser(transaction, { discordUserId: member.id });
