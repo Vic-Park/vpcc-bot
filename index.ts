@@ -1402,7 +1402,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					const teamMates = [];
 					for (const memberId of team.memberIds)
 						teamMates.push(await fetchUser(resources, memberId));
-					result.push(`Team ${team.name} with members: ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")} (id: ${team.id})`);
+					result.push(`Team ${team.name}${team.freeToJoin ? " (free to join)" : "" } with members: ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")} (id: ${team.id})`);
 					if (result.length >= 8) {
 						if (first) {
 							await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
