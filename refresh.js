@@ -112,13 +112,6 @@ const commands = [
 				.setDescription("Workshop name")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
-			.setName("announce-workshop")
-			.setDescription("Announces a workshop")
-			.addStringOption(option => option
-				.setName("workshop")
-				.setDescription("Workshop name or code")
-				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
 			.setName("list-all-teams")
 			.setDescription("Lists all teams and their ID"))
 		.addSubcommand(subcommand => subcommand
