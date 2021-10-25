@@ -1550,7 +1550,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.channel.send(createInfoOptions({
 					title: `Created challenge ${challengeInfo.name} (id: ${challengeInfo.id})`,
 					info: {
-						"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+						"Workshop": workshop && [ `${workshop.name} (code: ${workshop.id})` ],
 						"Points": [ `${challengeInfo.points}` ],
 					},
 				}));
@@ -1735,7 +1735,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Challenge ${challenge.name} (id: ${challenge.id})`,
 						info: {
-							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Workshop": workshop && [ `${workshop.name} (code: ${workshop.id})` ],
 							"Points": [ `${challenge.points}` ],
 							"Submission IDs": (challenge.submissionIds ?? []),
 						},
@@ -1876,7 +1876,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Just to confirm, are you attempting to destroy challenge ${challenge.name} (id: ${challenge.id})`,
 						info: {
-							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Workshop": workshop && [ `${workshop.name} (code: ${workshop.id})` ],
 							"Points": [ `${challenge.points}` ],
 						},
 					}),
@@ -1915,7 +1915,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					...createInfoOptions({
 						title: `Removed challenge ${challengeInfo.name} (id: ${challengeInfo.id})`,
 						info: {
-							"Workshop": workshop && [ `${workshop.name} (id: ${workshop.id})` ],
+							"Workshop": workshop && [ `${workshop.name} (code: ${workshop.id})` ],
 							"Points": [ `${challengeInfo.points}` ],
 						},
 					}),
