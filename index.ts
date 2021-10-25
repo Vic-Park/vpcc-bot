@@ -1351,7 +1351,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 					const teamMates = [];
 					for (const memberId of team.memberIds)
 						teamMates.push(await fetchUser(resources, memberId));
-					result.push(`Team ${team.name} with ID ${team.id} and members ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")}`);
+					result.push(`Team ${team.name} with members: ${teamMates.map(member => `<@${member.discordUserId}>`).join(", ")} (id: ${team.id})`);
 					if (result.length >= 8) {
 						if (first) {
 							await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
@@ -1379,7 +1379,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let first = true;
 				for (const workshopId of (await resources.fetch(`/workshops`)).ids ??= []) {
 					const workshop = await resources.fetch(`/workshop/${workshopId}`);
-					result.push(`${workshop.name} with code ${workshop.id} hosted by <@${workshop.hostDiscordUserId}>`);
+					result.push(`Workshop ${workshop.name} hosted by <@${workshop.hostDiscordUserId}> (code: ${workshop.id})`);
 					if (result.length >= 8) {
 						if (first) {
 							await interaction.reply({ ephemeral, content: result.join("\n"), allowedMentions: { parse: [] } });
