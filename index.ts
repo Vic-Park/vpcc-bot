@@ -1499,7 +1499,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				await interaction.followUp({ ephemeral, content: `Destroying workshop...` });
 				// destroy workshop interaction
 				if (workshop.interactionId) {
-					removeFromArray((await transaction.fetch(`/interactions`)).ids ??= [], workshop.interactionId);
+					removeFromArray((await transaction.fetch(`/interactions`)).interactionIds ??= [], workshop.interactionId);
 					clearObject(await transaction.fetch(`/interaction/${workshop.interactionId}`));
 					delete workshop.interactionId;
 				}
