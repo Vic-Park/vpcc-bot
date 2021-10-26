@@ -183,6 +183,17 @@ const commands = [
 				.setDescription("Optional submission content")
 				.setRequired(false)))
 		.addSubcommand(subcommand => subcommand
+			.setName("judge-submission")
+			.setDescription("Judges a submission and associates challenges")
+			.addStringOption(option => option
+				.setName("submission")
+				.setDescription("Submission ID")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("challenges")
+				.setDescription("Challenges' names or IDs (comma-separated)")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
 			.setName("get-challenge")
 			.setDescription("Gets information on a challenge")
 			.addStringOption(option => option
@@ -286,6 +297,17 @@ const commands = [
 			.setName("team")
 			.setDescription("Team name or ID (defaults to your own)")
 			.setRequired(false)),
+	new SlashCommandBuilder()
+		.setName("submit")
+		.setDescription("Creates a submission to be judged by a leader")
+		.addUserOption(option => option
+			.setName("leader")
+			.setDescription("The leader to notify")
+			.setRequired(true))
+		.addStringOption(option => option
+			.setName("content")
+			.setDescription("Submission content")
+			.setRequired(true)),
 ];
 
 const rest = new REST({ version: "9" }).setToken(process.env.BOT_TOKEN);

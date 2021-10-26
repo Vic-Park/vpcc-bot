@@ -1642,6 +1642,95 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				return;
 			}
+			if (subcommandName === "judge-submission") {
+				const submissionResolvable = interaction.options.getString("submission", true);
+				const challengeResolvables = interaction.options.getString("challenges", true).split(",").map(s => s.trim());
+				console.log([ "admin", "judge-submission", submissionResolvable, challengeResolvables, metadata ]);
+				const transaction = createTransaction(resources);
+				// fail if submission doesn't exist
+				const submission = await resolveSubmission(transaction, submissionResolvable);
+				if (!submission)
+					throw new InteractionError(`Could not resolve submission ${submissionResolvable}`);
+				// fail if any challenge couldn't be resolved
+				const challenges = [];
+				for (const challengeResolvable of challengeResolvables) {
+					const challenge = await resolveChallenge(transaction, challengeResolvable);
+					if (!challenge)
+						throw new InteractionError(`Could not resolve challenge ${challengeResolvable}`);
+					challenges.push(challenge);
+				}
+				// get linked stuff
+				const user = submission.memberId ? await fetchUser(transaction, submission.memberId) : undefined;
+				const team = await fetchTeam(transaction, submission.teamId);
+				// confirmation
+				const customIdPrefix = `${Date.now()}${interaction.user.id}`;
+				await interaction.reply({
+					ephemeral,
+					...createInfoOptions({
+						title: `Just to confirm, are you judging submission (id: ${submission.id})`,
+						info: {
+							"Pending": submission.pending ? [ `Yes` ] : undefined,
+							"Judge": [ `<@${submission.judgeDiscordUserId}>` ],
+							"Member": user && [ `<@${user.discordUserId}> (id: ${user.id})` ],
+							"Team": [ `${team.name} (id: ${team.id})` ],
+							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
+							"Content": submission.content && [ submission.content ],
+						},
+					}),
+					components: [
+						new MessageActionRow({ components: [
+							new MessageButton({ customId: customIdPrefix + "yes", label: "Confirm", style: "SUCCESS" }),
+							new MessageButton({ customId: customIdPrefix + "no", label: "Cancel", style: "SECONDARY" }),
+						] }),
+					],
+				});
+				const nextInteraction = await new Promise(resolve => {
+					assert(interaction.channel);
+					const collector = interaction.channel.createMessageComponentCollector({
+						time: 10_000,
+						max: 1,
+						filter: i => (
+							i.customId.startsWith(customIdPrefix)
+							&& i.user.id === interaction.user.id
+						),
+					});
+					collector.on("end", collected => resolve(collected.first()));
+				}) as MessageComponentInteraction | undefined;
+				if (!nextInteraction)
+					throw new InteractionError(`Confirmation timed out`);
+				if (nextInteraction.customId.endsWith("no"))
+					throw new InteractionError(`Cancelled submission judging`);
+				// reply to interaction
+				await interaction.reply({ ephemeral, content: `Editing submission...` });
+				// edit submission
+				const submissionPatch = {
+					challengeIds: challenges.map(c => c.id),
+					judgeDiscordUserId: interaction.user.id,
+					judgedTimestamp: Date.now(),
+					pending: false,
+				};
+				for (const challenge of challenges)
+					(challenge.submissionIds ??= []).push(submission.id);
+				(team.submissionIds ??= []).push(submission.id);
+				Object.assign(submission, submissionPatch);
+				// commit and complete
+				await transaction.commit();
+				await interaction.channel.send({
+					allowedMentions: { parse: [] },
+					...createInfoOptions({
+						title: `Updated submission (id: ${submission.id})`,
+						info: {
+							"Challenges": challenges.map(c => c.name),
+							"Member": user && [ `<@${user.discordUserId}>` ] ,
+							"Team": [ `${team.name}` ],
+							"Judge": [ `<@${submission.judgeDiscordUserId}>` ],
+							"Points": [ `${challenges.reduce((p, c) => p + c.points, 0)}` ],
+						},
+					}),
+				});
+				return;
+			}
 			if (subcommandName === "get-submission") {
 				const submissionId = interaction.options.getString("submission", true);
 				console.log([ "admin", "get-submission", submissionId, metadata ]);
@@ -2372,6 +2461,69 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						"Last Challenge": challenges.length ? [ `${challenges[challenges.length - 1].name}` ] : undefined,
 					},
 				}),
+			});
+			return;
+		}
+
+		if (interaction.commandName === "submit") {
+			const leader = await interaction.guild.members.fetch(interaction.options.getUser("leader", true));
+			const content = interaction.options.getString("content", true);
+			console.log([ "submit", leader.user.tag, content, metadata ]);
+			const transaction = createTransaction(resources);
+			// fail if user doesn't exist or doesn't have a team
+			const user = await resolveUser(transaction, interaction.user.id);
+			if (!user || user.teamId == null)
+				throw new InteractionError(`You don't have a team`);
+			const team = await fetchTeam(transaction, user.teamId);
+			// fail if leader isn't a leader
+			if (!leader.roles.cache.some(role => role.name.toLowerCase() === "leader"))
+				throw new InteractionError(`${leader} isn't a leader`);// create team text and voice channels
+			// fail if couldn't find judging channel
+			const judgingChannel = (await interaction.guild.channels.fetch()).find(channel => (
+				channel instanceof TextChannel
+				&& channel.name.toLowerCase() === "judging"
+			)) as TextChannel | undefined;
+			if (!judgingChannel)
+				throw new Error("Internal judging channel not found");
+			// reply to interaction
+			await interaction.reply({ ephemeral, content: `Creating a pending submission and notifying ${leader}` });
+			// create submission
+			const submissionInfo: Record<string, any> = {
+				id: interaction.id,
+				teamId: team.id,
+				memberId: user.id,
+				challengeIds: [],
+				judgeDiscordUserId: leader.id,
+				createdTimestamp: Date.now(),
+				content,
+				pending: true,
+			};
+			((await transaction.fetch(`/submissions`)).ids ??= []).push(submissionInfo.id);
+			(team.submissionIds ??= []).push(submissionInfo.id);
+			const submission = await transaction.fetch(`/submissions/${submissionInfo.id}`);
+			Object.assign(submission, submissionInfo);
+			// commit and complete
+			await transaction.commit();
+			await interaction.followUp(createInfoOptions({
+				title: `Created pending submission (id: ${submissionInfo.id})`,
+				info: {
+					"Member": [ `<@${user.discordUserId}>` ],
+					"Team": [ `${team.name}` ],
+					"Judge": [ `<@${submissionInfo.judgeDiscordUserId}>` ],
+					"Content": [ `${submissionInfo.content}` ],
+				},
+			}));
+			await judgingChannel.send({
+				...createInfoOptions({
+					title: `New pending submission (id: ${submissionInfo.id})`,
+					info: {
+						"Member": [ `<@${user.discordUserId}>` ],
+						"Team": [ `${team.name}` ],
+						"Judge": [ `<@${submissionInfo.judgeDiscordUserId}>` ],
+						"Content": [ `${submissionInfo.content}` ],
+					},
+				}),
+				allowedMentions: { parse: [], users: [ submissionInfo.judgeDiscordUserId ] },
 			});
 			return;
 		}
