@@ -1702,7 +1702,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				if (nextInteraction.customId.endsWith("no"))
 					throw new InteractionError(`Cancelled submission judging`);
 				// reply to interaction
-				await interaction.reply({ ephemeral, content: `Editing submission...` });
+				await interaction.followUp({ ephemeral, content: `Editing submission...` });
 				// edit submission
 				const submissionPatch = {
 					challengeIds: challenges.map(c => c.id),
