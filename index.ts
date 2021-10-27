@@ -1874,6 +1874,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let points = 0;
 				for (const challenge of challenges)
 					points += challenge.points;
+				// get last challenge or workshop
+				const lastSubmission = [...submissions].reverse().find(submission => (submission.challengeIds ?? []).length > 0);
+				const lastChallenge = lastSubmission && await resources.fetch(`/challenges/${lastSubmission.challengeIds[lastSubmission.challengeIds.length - 1]}`);
+				const lastWorkshop = lastChallenge && (lastChallenge.workshopId ? await resources.fetch(`/workshop/${lastChallenge.workshopId}`) : undefined);
 				// complete
 				await interaction.reply({
 					ephemeral,
@@ -1886,7 +1890,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 							"Workshops": [ `${workshops.length}` ],
 							"Challenges": [ `${challenges.length}` ],
 							"Submissions": [ `${submissions.length}` ],
-							"Last Challenge": challenges.length ? [ `${challenges[challenges.length - 1].name}` ] : undefined,
+							"Last Challenge": (
+								lastWorkshop ? [ `${lastWorkshop.name}'s challenge ${lastChallenge.name}` ]
+								: lastChallenge ? [ `Challenge ${lastChallenge.name}` ]
+								: undefined
+							),
 						},
 					}),
 				});
@@ -2457,6 +2465,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			let points = 0;
 			for (const challenge of challenges)
 				points += challenge.points;
+			// get last challenge or workshop
+			const lastSubmission = [...submissions].reverse().find(submission => (submission.challengeIds ?? []).length > 0);
+			const lastChallenge = lastSubmission && await resources.fetch(`/challenges/${lastSubmission.challengeIds[lastSubmission.challengeIds.length - 1]}`);
+			const lastWorkshop = lastChallenge && (lastChallenge.workshopId ? await resources.fetch(`/workshop/${lastChallenge.workshopId}`) : undefined);
 			// complete
 			await interaction.reply({
 				ephemeral,
@@ -2468,7 +2480,11 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						"Workshops": [ `${workshops.length}` ],
 						"Challenges": [ `${challenges.length}` ],
 						"Submissions": [ `${submissions.length}` ],
-						"Last Challenge": challenges.length ? [ `${challenges[challenges.length - 1].name}` ] : undefined,
+						"Last Challenge": (
+							lastWorkshop ? [ `${lastWorkshop.name}'s challenge ${lastChallenge.name}` ]
+							: lastChallenge ? [ `Challenge ${lastChallenge.name}` ]
+							: undefined
+						),
 					},
 				}),
 			});
