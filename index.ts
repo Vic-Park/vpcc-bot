@@ -467,6 +467,17 @@ async function resolveChallenge(resources: Fetchable, challengeResolvable: strin
 	const challengeById = await resources.fetch(`/challenges/${challengeResolvable}`);
 	if (challengeById.id)
 		return challengeById;
+	if (challengeResolvable.includes(":")) {
+		const splitIndex = challengeResolvable.indexOf(":");
+		const workshop = await resolveWorkshop(resources, challengeResolvable.substring(0, splitIndex));
+		const challengeResolvable2 = challengeResolvable.substring(splitIndex + 1);
+		if (workshop)
+			for (const challengeId of (workshop.challengeIds ?? [])) {
+				const challenge = await resources.fetch(`/challenges/${challengeId}`);
+				if (challenge.name.toLowerCase() === challengeResolvable2.toLowerCase())
+					return challenge;
+			}
+	}
 	for (const challengeId of (await resources.fetch(`/challenges`)).ids ?? []) {
 		const challenge = await resources.fetch(`/challenges/${challengeId}`);
 		if (challenge.name.toLowerCase() === challengeResolvable.toLowerCase())
