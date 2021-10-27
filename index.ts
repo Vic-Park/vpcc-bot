@@ -1712,7 +1712,6 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				};
 				for (const challenge of challenges)
 					(challenge.submissionIds ??= []).push(submission.id);
-				(team.submissionIds ??= []).push(submission.id);
 				Object.assign(submission, submissionPatch);
 				// commit and complete
 				await transaction.commit();
