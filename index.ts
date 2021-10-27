@@ -2478,7 +2478,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			if (!leader.roles.cache.some(role => role.name.toLowerCase() === "leader"))
 				throw new InteractionError(`${leader} isn't a leader`);// create team text and voice channels
 			// fail if couldn't find judging channel
-			const judgingChannel = (await interaction.guild.channels.fetch()).find(channel => (
+			const judgingChannel = interaction.guild.channels.cache.find(channel => (
 				channel instanceof TextChannel
 				&& channel.name.toLowerCase() === "judging"
 			)) as TextChannel | undefined;
