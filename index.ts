@@ -2503,15 +2503,18 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			Object.assign(submission, submissionInfo);
 			// commit and complete
 			await transaction.commit();
-			await interaction.followUp(createInfoOptions({
-				title: `Created pending submission (id: ${submissionInfo.id})`,
-				info: {
-					"Member": [ `<@${user.discordUserId}>` ],
-					"Team": [ `${team.name}` ],
-					"Judge": [ `<@${submissionInfo.judgeDiscordUserId}>` ],
-					"Content": [ `${submissionInfo.content}` ],
-				},
-			}));
+			await interaction.followUp({
+				ephemeral,
+				...createInfoOptions({
+					title: `Created pending submission (id: ${submissionInfo.id})`,
+					info: {
+						"Member": [ `<@${user.discordUserId}>` ],
+						"Team": [ `${team.name}` ],
+						"Judge": [ `<@${submissionInfo.judgeDiscordUserId}>` ],
+						"Content": [ `${submissionInfo.content}` ],
+					},
+				}),
+			});
 			await judgingChannel.send({
 				...createInfoOptions({
 					title: `New pending submission (id: ${submissionInfo.id})`,
