@@ -1340,7 +1340,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				workshop.hostDiscordUserId = interaction.user.id;
 				// reply to interaction
 				await transaction.commit();
-				await interaction.followUp({ ephemeral, content: `Created workshop` });
+				await interaction.channel.send(`Created workshop ${workshop.name} (code: ${workshop.id})`);
 				return;
 			}
 			if (subcommandName === "list-all-teams") {
