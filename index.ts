@@ -1,7 +1,7 @@
 // Runs the VPCC-Bot
 
 import _assert from "assert";
-import { CategoryChannel, Client, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, Team, TextChannel, User, VoiceChannel } from "discord.js";
+import { CategoryChannel, Client, Constants, DiscordAPIError, Guild, GuildChannel, Intents, Interaction, MessageActionRow, MessageButton, MessageComponentInteraction, MessageOptions, Permissions, Role, Team, TextChannel, User, VoiceChannel } from "discord.js";
 import Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import NodeCache from "node-cache";
@@ -1455,22 +1455,43 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				}
 				// destroy workshop role
 				if (workshop.discordRoleId) {
-					const role = await interaction.guild.roles.fetch(workshop.discordRoleId);
-					if (role)
-						await role.delete();
+					try {
+						const role = await interaction.guild.roles.fetch(workshop.discordRoleId);
+						if (role)
+							await role.delete();
+					} catch (e) {
+						if (!(e instanceof DiscordAPIError))
+							throw e;
+						if (e.code !== Constants.APIErrors.UNKNOWN_ROLE)
+							throw e;
+					}
 					delete workshop.discordRoleId;
 				}
 				// destroy workshop channels
 				if (workshop.discordTextChannelId) {
-					const textChannel = await interaction.guild.channels.fetch(workshop.discordTextChannelId);
-					if (textChannel)
-						await textChannel.delete();
+					try {
+						const textChannel = await interaction.guild.channels.fetch(workshop.discordTextChannelId);
+						if (textChannel)
+							await textChannel.delete();
+					} catch (e) {
+						if (!(e instanceof DiscordAPIError))
+							throw e;
+						if (e.code !== Constants.APIErrors.UNKNOWN_CHANNEL)
+							throw e;
+					}
 					delete workshop.discordTextChannelId;
 				}
 				if (workshop.discordVoiceChannelId) {
-					const voiceChannel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
-					if (voiceChannel)
-						await voiceChannel.delete();
+					try {
+						const voiceChannel = await interaction.guild.channels.fetch(workshop.discordVoiceChannelId);
+						if (voiceChannel)
+							await voiceChannel.delete();
+					} catch (e) {
+						if (!(e instanceof DiscordAPIError))
+							throw e;
+						if (e.code !== Constants.APIErrors.UNKNOWN_CHANNEL)
+							throw e;
+					}
 					delete workshop.discordVoiceChannelId;
 				}
 				// destroy team if required
