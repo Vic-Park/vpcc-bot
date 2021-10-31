@@ -1811,7 +1811,10 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						title: `Workshop ${workshop.name} (code: ${workshop.id})`,
 						info: {
 							"Host": [ `<@${workshop.hostDiscordUserId}>` ],
+							"Thread": workshop.discordThreadChannelId && [ `<#${workshop.discordThreadChannelId}>` ],
 							"Challenges": challenges.map(c => `${c.name} (id: ${c.id})`),
+							"Text Channel (deprecated)": workshop.discordTextChannelId && [ `<#${workshop.discordTextChannelId}>` ],
+							"Voice Channel (deprecated)": workshop.discordVoiceChannelId && [ `<#${workshop.discordVoiceChannelId}>` ],
 						},
 					}),
 				});
