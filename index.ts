@@ -69,11 +69,62 @@ class ReplitBackedMap {
 	async clear() { await this.client.empty(); return; }
 }
 
-const store: Store = new KeyvStore(new Keyv({
+const fileStore = new KeyvStore(new Keyv({
 	store: new KeyvFile({
 		filename: "store.json",
 	}),
 }) as Keyv<Object>);
+
+assert(process.env.REPLIT_DB_URL);
+const replitStore = new KeyvStore(new Keyv({
+	store: new ReplitBackedMap(
+		new ReplitClient(process.env.REPLIT_DB_URL)
+	),
+}));
+
+let store: Store = new CopyStore(fileStore, replitStore);
+(async () => {
+	async function getset(resource: string): Promise<Record<string, any>> {
+		const data = await fileStore.get(resource);
+		await replitStore.set(resource, data);
+		await sleep(20);
+		return data;
+	}
+	// check if we've haven't migrated yet
+	const version = 2;
+	const meta = await store.get(`/meta`) as Record<string, any>;
+	if ((meta.version ?? 0) < version) {
+		// users
+		for (const id of (await getset(`/users`)).userIds ?? [])
+			await getset(`/user/${id}`);
+		// teams
+		for (const id of (await getset(`/teams`)).teamIds ?? [])
+			await getset(`/team/${id}`);
+		// workshops
+		for (const id of (await getset(`/workshops`)).ids ?? [])
+			await getset(`/workshop/${id}`);
+		// challenges
+		for (const id of (await getset(`/challenges`)).ids ?? [])
+			await getset(`/challenges/${id}`);
+		// submissions
+		for (const id of (await getset(`/submissions`)).ids ?? [])
+			await getset(`/submissions/${id}`);
+		// submissions
+		for (const id of (await getset(`/submissions`)).ids ?? [])
+			await getset(`/submissions/${id}`);
+		// interactions
+		for (const id of (await getset(`/interactions`)).interactionIds ?? [])
+			await getset(`/interaction/${id}`);
+		// joinRandom
+		await getset(`/joinRandom`);
+		// leaderboard
+		await getset(`/leaderboard`);
+		// update migration version
+		await store.set(`/meta`, { version });
+	}
+	console.log(`at version ${version}`);
+	store = replitStore;
+})();
 
 // Helper function to remove an element from an array
 function removeFromArray<T>(array: T[], element: T): typeof array {
