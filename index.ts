@@ -1676,7 +1676,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			}
 			if (subcommandName === "judge-submission") {
 				const submissionResolvable = interaction.options.getString("submission", true);
-				const challengeResolvables = (interaction.options.getString("challenges") ?? "").split(",").map(s => s.trim());
+				const rawChallenges = interaction.options.getString("challenges");
+				const challengeResolvables = rawChallenges ? rawChallenges.split(",").map(s => s.trim()) : [];
 				console.log([ "admin", "judge-submission", submissionResolvable, challengeResolvables, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if submission doesn't exist
