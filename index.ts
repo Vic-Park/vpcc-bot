@@ -63,7 +63,7 @@ class CopyStore implements Store {
 // wrapper class around the replit client to include a clear method
 class ReplitBackedMap {
 	constructor(public client: ReplitClient) {};
-	async get(key: string): Promise<any> { return await this.client.get(key); }
+	async get(key: string): Promise<any> { return await this.client.get(key) ?? undefined; }
 	async set(key: string, value: any) { await this.client.set(encodeURIComponent(key), encodeURIComponent(value)); return; }
 	async delete(key: string) { await this.client.delete(key); return true; }
 	async clear() { await this.client.empty(); return; }
