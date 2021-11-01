@@ -37,11 +37,6 @@ class Store {
 		else
 			await this.keyv.set(resource, data);
 	};
-	async modify(resource: string, callback: (data: Object) => any): Promise<void> {
-		const data = await this.get(resource);
-		await callback(data);
-		await this.set(resource, data);
-	};
 }
 function createStore(keyv: Keyv<Object>): Store {
 	return new Store(keyv);
