@@ -192,7 +192,7 @@ const commands = [
 			.addStringOption(option => option
 				.setName("challenges")
 				.setDescription("Challenges' names or IDs (comma-separated)")
-				.setRequired(true)))
+				.setRequired(false)))
 		.addSubcommand(subcommand => subcommand
 			.setName("get-challenge")
 			.setDescription("Gets information on a challenge")
