@@ -23,8 +23,13 @@ function assert<T>(thing: T): asserts thing is NonNullable<T> {
 	_assert(thing != null);
 }
 
+type Store = {
+	get(resource: string): Promise<Object>,
+	set(resource: string, data: Object): Promise<void>,
+}
+
 // keyv-file based store (will be upgraded to use replit's built in key value store later)
-class Store {
+class KeyvStore implements Store {
 	keyv: Keyv<Object>;
 	constructor(keyv: Keyv<Object>) {
 		this.keyv = keyv;
@@ -41,7 +46,7 @@ class Store {
 }
 
 // helper store that forwards assignments to an additional store
-class CopyStore {
+class CopyStore implements Store {
 	constructor(
 		public main: Store,
 		public backup: Store,
@@ -64,7 +69,7 @@ class ReplitBackedMap {
 	async clear() { await (this.client.empty() as unknown as Promise<ReplitClient>); return; }
 }
 
-const store = new Store(new Keyv({
+const store: Store = new KeyvStore(new Keyv({
 	store: new KeyvFile({
 		filename: "store.json",
 	}),
