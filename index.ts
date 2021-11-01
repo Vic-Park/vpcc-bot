@@ -54,10 +54,7 @@ class CopyStore {
 	};
 }
 
-function createStore(keyv: Keyv<Object>): Store {
-	return new Store(keyv);
-}
-const store = createStore(new Keyv({
+const store = new Store(new Keyv({
 	store: new KeyvFile({
 		filename: "store.json",
 	}),
