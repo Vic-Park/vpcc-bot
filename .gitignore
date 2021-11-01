@@ -4,3 +4,4 @@ store.json
 .random
 dist
 package-lock.json
+.cache
