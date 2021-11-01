@@ -38,6 +38,22 @@ class Store {
 			await this.keyv.set(resource, data);
 	};
 }
+
+// helper store that forwards assignments to an additional store
+class CopyStore {
+	constructor(
+		public main: Store,
+		public backup: Store,
+	) {};
+	async get(resource: string): Promise<Object> {
+		return await this.main.get(resource);
+	};
+	async set(resource: string, data: Object): Promise<void> {
+		await this.main.set(resource, data);
+		return await this.backup.set(resource, data);
+	};
+}
+
 function createStore(keyv: Keyv<Object>): Store {
 	return new Store(keyv);
 }
