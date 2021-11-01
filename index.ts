@@ -1849,7 +1849,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				let user = await findUser(resources, { discordUserId: discordMember.id });
 				if (!user) {
 					const transaction = createTransaction(resources);
-					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: interaction.user.id });
+					user = await createUser(interaction.guild, transaction, { id: interaction.id, discordUserId: discordMember.id });
 					await transaction.commit();
 				}
 				// get linked stuff
