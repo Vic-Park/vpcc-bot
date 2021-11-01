@@ -1,7 +1,6 @@
 {
-    "strictNullChecks": false,
     "compilerOptions": {
-        "target": "esnext",
+        "target": "es5",
         "module": "commonjs",
         "moduleResolution": "node",
         "strict": true,
@@ -12,6 +11,8 @@
         "lib": [
             "esnext",
         ],
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "strictNullChecks": false,
+				"downlevelIteration": true
     }
 }
