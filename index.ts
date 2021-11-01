@@ -69,11 +69,13 @@ class ReplitBackedMap {
 	async clear() { await this.client.empty(); return; }
 }
 
+/*
 const fileStore = new KeyvStore(new Keyv({
 	store: new KeyvFile({
 		filename: "store.json",
 	}),
 }) as Keyv<Object>);
+*/
 
 assert(process.env.REPLIT_DB_URL);
 const replitStore = new KeyvStore(new Keyv({
@@ -82,7 +84,9 @@ const replitStore = new KeyvStore(new Keyv({
 	),
 }));
 
-let store: Store = new CopyStore(fileStore, replitStore);
+let store: Store = replitStore;
+
+/*
 (async () => {
 	async function getset(resource: string): Promise<Record<string, any>> {
 		const data = await fileStore.get(resource);
@@ -125,6 +129,7 @@ let store: Store = new CopyStore(fileStore, replitStore);
 	console.log(`at version ${version}`);
 	store = replitStore;
 })();
+*/
 
 // Helper function to remove an element from an array
 function removeFromArray<T>(array: T[], element: T): typeof array {
