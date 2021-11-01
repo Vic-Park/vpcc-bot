@@ -5,7 +5,7 @@ import { CategoryChannel, Client, Constants, DiscordAPIError, Guild, GuildChanne
 import Keyv from "keyv";
 import { KeyvFile } from "keyv-file";
 import NodeCache from "node-cache";
-import { Client as ReplitClient } from "@replit/database";
+import ReplitClient from "@replit/database";
 
 require("dotenv").config();
 
@@ -63,10 +63,10 @@ class CopyStore implements Store {
 // wrapper class around the replit client to include a clear method
 class ReplitBackedMap {
 	constructor(public client: ReplitClient) {};
-	async get(key: string): Promise<any> { return (await this.client.get(key)); }
-	async set(key: string, value: any) { await (this.client.set(encodeURIComponent(key), encodeURIComponent(value)) as unknown as Promise<ReplitClient>); return; }
-	async delete(key: string) { await (this.client.delete(key) as unknown as Promise<ReplitClient>); return true; }
-	async clear() { await (this.client.empty() as unknown as Promise<ReplitClient>); return; }
+	async get(key: string): Promise<any> { return await this.client.get(key); }
+	async set(key: string, value: any) { await this.client.set(encodeURIComponent(key), encodeURIComponent(value)); return; }
+	async delete(key: string) { await this.client.delete(key); return true; }
+	async clear() { await this.client.empty(); return; }
 }
 
 const store: Store = new KeyvStore(new Keyv({
