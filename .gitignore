@@ -3,3 +3,4 @@ node_modules
 store.json
 .random
 dist
+package-lock.json
