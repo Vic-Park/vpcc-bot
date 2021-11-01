@@ -1,2 +1,2 @@
 language = "nodejs"
-run = "node dist/index.js"
+run = "mkdir -p dist && npx typescript@4.4.4 --outDir dist && npx node@16 dist/index.js"
