@@ -339,18 +339,8 @@ async function createUser(_guild: any, transaction: Fetchable, { id, ...properti
 	return user;
 }
 
-// Adapted from https://developer.mozilla.org/en-US/docs/web/javascript/reference/global_objects/error#custom_error_types
 class InteractionError extends Error {
-	constructor(...params: any[]) {
-		// Pass remaining arguments (including vendor specific ones) to parent constructor
-		super(...params)
-
-		// Maintains proper stack trace for where our error was thrown (only available on V8)
-		if (Error.captureStackTrace)
-			Error.captureStackTrace(this, InteractionError)
-
-		this.name = "InteractionError";
-	}
+	name = "InteractionError";
 }
 
 async function createTeam(guild: Guild, transaction: Fetchable, { id, ...properties }: Pick<TeamData, "id" | "name" | "freeToJoin">): Promise<TeamData> {
