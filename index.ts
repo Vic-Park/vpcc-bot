@@ -1397,8 +1397,8 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				return;
 			}
 			if (subcommandName === "register-workshop") {
-				const workshopCode = interaction.options.getString("workshop-code", true);
 				const workshopName = interaction.options.getString("workshop-name", true);
+				const workshopCode = interaction.options.getString("workshop-code", true);
 				console.log([ "admin", "register-workshop", workshopCode, workshopName, metadata ]);
 				const transaction = createTransaction(resources);
 				// fail if workshop code has caps or spaces

@@ -104,12 +104,12 @@ const commands = [
 			.setName("register-workshop")
 			.setDescription("Creates a workshop")
 			.addStringOption(option => option
-				.setName("workshop-code")
-				.setDescription("Workshop code")
-				.setRequired(true))
-			.addStringOption(option => option
 				.setName("workshop-name")
 				.setDescription("Workshop name")
+				.setRequired(true))
+			.addStringOption(option => option
+				.setName("workshop-code")
+				.setDescription("Workshop code")
 				.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
 			.setName("list-all-teams")
