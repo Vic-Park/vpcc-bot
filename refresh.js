@@ -110,7 +110,7 @@ const commands = [
 			.addStringOption(option => option
 				.setName("workshop-code")
 				.setDescription("Workshop code")
-				.setRequired(true)))
+				.setRequired(false)))
 		.addSubcommand(subcommand => subcommand
 			.setName("list-all-teams")
 			.setDescription("Lists all teams and their ID"))
