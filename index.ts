@@ -653,6 +653,18 @@ function createTeamRenameRequestOptions(
 	};
 }
 
+function createRoleUpdateOptions(
+	roleName: string,
+	disabled: boolean = false,
+): MessageOptions {
+	return { components: [
+		new MessageActionRow({ components: [
+			new MessageButton({ customId: "add", label: `Get ${roleName} role`, style: "SUCCESS", disabled }),
+			new MessageButton({ customId: "remove", label: `Remove ${roleName} role`, style: "SECONDARY", disabled }),
+		] }),
+	] };
+}
+
 // accept: ✅
 // deny: ❌
 // cancel: 🗑️
@@ -1076,6 +1088,30 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				// complete command
 				await transaction.commit();
 				await interaction.followUp({ ephemeral, content: `Removed ${workshop.name} workshop role from you` });
+				return;
+			}
+		}
+		if (info.type === "roleUpdate") {
+			const caller = await interaction.guild.members.fetch(interaction.user.id);
+			const role = await interaction.guild.roles.fetch(info.discordRoleId);
+			if (!role)
+				throw new InteractionError(`Role <@&${info.discordRoleId}> doesn't exist anymore`);
+			if (action === "add") {
+				if (caller.roles.cache.has(info.discordRoleId))
+					throw new InteractionError(`You already have the <@&${info.discordRoleId}> role`);
+				await caller.roles.add(info.discordRoleId);
+				// complete command
+				await transaction.commit();
+				await interaction.followUp({ ephemeral, content: `Added <@&${info.discordRoleId}> role to you` });
+				return;
+			}
+			if (action === "remove") {
+				if (!caller.roles.cache.has(info.discordRoleId))
+					throw new InteractionError(`You already don't have the <@&${info.discordRoleId}> role`);
+				await caller.roles.remove(info.discordRoleId);
+				// complete command
+				await transaction.commit();
+				await interaction.followUp({ ephemeral, content: `Removed <@&${info.discordRoleId}> role from you` });
 				return;
 			}
 		}
@@ -2139,6 +2175,26 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 						},
 					}),
 				});
+				return;
+			}
+			if (subcommandName === "create-role-buttons") {
+				const role = interaction.options.getRole("role", true);
+				console.log([ "admin", "create-role-buttons", `${role.id}:${role.name}`, metadata ]);
+				await interaction.followUp({ ephemeral, content: `Creating role getting message...` });
+				// create role updating message
+				const message = await interaction.channel.send(createRoleUpdateOptions(role.name, true));
+				// create delayed interaction info
+				const transaction = createTransaction(resources);
+				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
+				const info = await transaction.fetch(`/interaction/${message.id}`);
+				Object.assign(info, {
+					id: message.id,
+					type: "roleUpdate",
+					discordRoleId: role.id,
+				});
+				await transaction.commit();
+				// enable the buttons
+				await message.edit(createRoleUpdateOptions(role.name, false));
 				return;
 			}
 		}

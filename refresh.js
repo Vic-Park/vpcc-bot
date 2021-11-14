@@ -241,6 +241,13 @@ const commands = [
 			.addStringOption(option => option
 				.setName("challenge")
 				.setDescription("Challenge name or ID")
+				.setRequired(true)))
+		.addSubcommand(subcommand => subcommand
+			.setName("create-role-buttons")
+			.setDescription("Sends a message with buttons to add and remove roles")
+			.addRoleOption(option => option
+				.setName("role")
+				.setDescription("The role to add / remove")
 				.setRequired(true))),
 	new SlashCommandBuilder()
 		.setName("profile")
