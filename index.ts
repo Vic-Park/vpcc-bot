@@ -2180,7 +2180,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 			if (subcommandName === "create-role-buttons") {
 				const role = interaction.options.getRole("role", true);
 				console.log([ "admin", "create-role-buttons", `${role.id}:${role.name}`, metadata ]);
-				await interaction.followUp({ ephemeral, content: `Creating role getting message...` });
+				await interaction.reply({ ephemeral, content: `Creating role getting message...` });
 				// create role updating message
 				const message = await interaction.channel.send(createRoleUpdateOptions(role.name, true));
 				// create delayed interaction info
