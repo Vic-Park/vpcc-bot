@@ -93,13 +93,13 @@ const commands = [
 				.setName("new-team-name")
 				.setDescription("New name of team")
 				.setRequired(true)))
-		.addSubcommand(subcommand => subcommand
-			.setName("move-to-breakout-rooms")
-			.setDescription("Moves everyone into their team voice channel")
-			.addStringOption(option => option
-				.setName("workshop")
-				.setDescription("Workshop name or code")
-				.setRequired(true)))
+		// .addSubcommand(subcommand => subcommand
+		// 	.setName("move-to-breakout-rooms")
+		// 	.setDescription("Moves everyone into their team voice channel")
+		// 	.addStringOption(option => option
+		// 		.setName("workshop")
+		// 		.setDescription("Workshop name or code")
+		// 		.setRequired(true)))
 		.addSubcommand(subcommand => subcommand
 			.setName("register-workshop")
 			.setDescription("Creates a workshop")
