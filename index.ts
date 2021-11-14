@@ -2182,7 +2182,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				console.log([ "admin", "create-role-buttons", `${role.id}:${role.name}`, metadata ]);
 				await interaction.reply({ ephemeral, content: `Creating role getting message...` });
 				// create role updating message
-				const message = await interaction.channel.send(createRoleUpdateOptions(role.name, true));
+				const message = await interaction.channel.send({ content: "** **", ...createRoleUpdateOptions(role.name, true) });
 				// create delayed interaction info
 				const transaction = createTransaction(resources);
 				((await transaction.fetch(`/interactions`)).interactionIds ??= []).push(message.id);
@@ -2194,7 +2194,7 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 				});
 				await transaction.commit();
 				// enable the buttons
-				await message.edit(createRoleUpdateOptions(role.name, false));
+				await message.edit({ content: "** **", ...createRoleUpdateOptions(role.name, false) });
 				return;
 			}
 		}
